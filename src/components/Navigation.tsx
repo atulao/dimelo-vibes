@@ -132,7 +132,7 @@ export const Navigation = () => {
           <div className="flex items-center gap-2">
             {!user ? (
               <>
-                <GlobalSearch />
+                {/* <GlobalSearch /> */}
                 <Button variant="ghost" size="sm" asChild>
                   <Link to="/browse">Browse Conferences</Link>
                 </Button>
@@ -142,7 +142,7 @@ export const Navigation = () => {
               </>
             ) : (
               <>
-                <GlobalSearch />
+                {/* <GlobalSearch /> */}
                 <NotificationBell userId={user?.id} />
                 <DropdownMenu>
                 <DropdownMenuTrigger asChild>
