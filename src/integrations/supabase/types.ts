@@ -164,8 +164,10 @@ export type Database = {
           answered_at: string | null
           created_at: string
           id: string
+          is_answered: boolean | null
           question: string
           session_id: string
+          upvotes: number | null
           user_id: string | null
         }
         Insert: {
@@ -173,8 +175,10 @@ export type Database = {
           answered_at?: string | null
           created_at?: string
           id?: string
+          is_answered?: boolean | null
           question: string
           session_id: string
+          upvotes?: number | null
           user_id?: string | null
         }
         Update: {
@@ -182,8 +186,10 @@ export type Database = {
           answered_at?: string | null
           created_at?: string
           id?: string
+          is_answered?: boolean | null
           question?: string
           session_id?: string
+          upvotes?: number | null
           user_id?: string | null
         }
         Relationships: [
