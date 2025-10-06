@@ -13,6 +13,9 @@ import {
 import { UserRole } from "@/hooks/useUserRole";
 
 export const DevRoleToggle = () => {
+  // Only render in development mode
+  if (!import.meta.env.DEV) return null;
+  
   const [selectedRole, setSelectedRole] = useState<string>("none");
 
   useEffect(() => {

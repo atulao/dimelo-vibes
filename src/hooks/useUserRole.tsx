@@ -8,8 +8,10 @@ export const useUserRole = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   
-  // Dev mode override - check localStorage for role override
-  const devRoleOverride = localStorage.getItem('dev_role_override') as UserRole;
+  // Dev mode override - only works in development builds
+  const devRoleOverride = import.meta.env.DEV 
+    ? localStorage.getItem('dev_role_override') as UserRole 
+    : null;
 
   useEffect(() => {
     fetchUserRole();
@@ -54,7 +56,9 @@ export const useUserRole = () => {
         }
       }
     } catch (error) {
-      console.error("Error fetching user role:", error);
+      if (import.meta.env.DEV) {
+        console.error("Error fetching user role:", error);
+      }
       setRole("attendee"); // Default to attendee on error
     } finally {
       setLoading(false);
