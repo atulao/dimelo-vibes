@@ -280,8 +280,10 @@ export type Database = {
           description: string | null
           end_time: string | null
           id: string
+          is_public: boolean | null
           is_recording: boolean | null
           qr_code_url: string | null
+          recording_url: string | null
           speaker_bio: string | null
           speaker_email: string | null
           speaker_name: string | null
@@ -296,8 +298,10 @@ export type Database = {
           description?: string | null
           end_time?: string | null
           id?: string
+          is_public?: boolean | null
           is_recording?: boolean | null
           qr_code_url?: string | null
+          recording_url?: string | null
           speaker_bio?: string | null
           speaker_email?: string | null
           speaker_name?: string | null
@@ -312,8 +316,10 @@ export type Database = {
           description?: string | null
           end_time?: string | null
           id?: string
+          is_public?: boolean | null
           is_recording?: boolean | null
           qr_code_url?: string | null
+          recording_url?: string | null
           speaker_bio?: string | null
           speaker_email?: string | null
           speaker_name?: string | null

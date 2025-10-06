@@ -32,7 +32,10 @@ export const AudioRecorder = ({ sessionId, isSessionLive }: AudioRecorderProps) 
   const [recordingTime, setRecordingTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
@@ -95,6 +98,49 @@ export const AudioRecorder = ({ sessionId, isSessionLive }: AudioRecorderProps) 
     }
   };
 
+  const uploadRecording = async (audioBlob: Blob) => {
+    try {
+      setIsUploading(true);
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const fileName = `${user.id}/${sessionId}_${Date.now()}.webm`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("session-recordings")
+        .upload(fileName, audioBlob, {
+          contentType: "audio/webm",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("session-recordings")
+        .getPublicUrl(fileName);
+
+      await supabase
+        .from("sessions")
+        .update({ recording_url: publicUrl })
+        .eq("id", sessionId);
+
+      toast({
+        title: "Recording Saved",
+        description: "Audio recording has been uploaded successfully.",
+      });
+    } catch (error: any) {
+      console.error("Error uploading recording:", error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload recording.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const startRecording = async () => {
     if (!isSupported) {
       toast({
@@ -106,8 +152,27 @@ export const AudioRecorder = ({ sessionId, isSessionLive }: AudioRecorderProps) 
     }
 
     try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Request microphone permission and start audio recording
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Start MediaRecorder for audio capture
+      const mediaRecorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        await uploadRecording(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
@@ -196,6 +261,10 @@ export const AudioRecorder = ({ sessionId, isSessionLive }: AudioRecorderProps) 
       recognitionRef.current = null;
     }
 
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+
     setIsRecording(false);
 
     // Update session recording status
@@ -206,7 +275,7 @@ export const AudioRecorder = ({ sessionId, isSessionLive }: AudioRecorderProps) 
 
     toast({
       title: "Recording Stopped",
-      description: "Transcription has been paused.",
+      description: "Processing and uploading recording...",
     });
   };
 
@@ -249,6 +318,13 @@ export const AudioRecorder = ({ sessionId, isSessionLive }: AudioRecorderProps) 
           <Badge variant="outline" className="font-mono">
             {formatTime(recordingTime)}
           </Badge>
+        </div>
+      )}
+
+      {isUploading && (
+        <div className="flex items-center gap-2 p-3 bg-blue-500/10 rounded-md border border-blue-500/20">
+          <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+          <span className="text-sm font-medium">Uploading recording...</span>
         </div>
       )}
 
