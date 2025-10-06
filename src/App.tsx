@@ -8,6 +8,8 @@ import Auth from "./pages/Auth";
 import Organizations from "./pages/Organizations";
 import Conferences from "./pages/Conferences";
 import ConferenceDetail from "./pages/ConferenceDetail";
+import SessionLanding from "./pages/SessionLanding";
+import SessionLive from "./pages/SessionLive";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +26,8 @@ const App = () => (
           <Route path="/organizations" element={<Organizations />} />
           <Route path="/conferences" element={<Conferences />} />
           <Route path="/conferences/:id" element={<ConferenceDetail />} />
+          <Route path="/session/:id" element={<SessionLanding />} />
+          <Route path="/session/:id/live" element={<SessionLive />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
