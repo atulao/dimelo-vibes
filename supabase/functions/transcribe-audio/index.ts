@@ -42,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { audio, sessionId } = await req.json();
+    const { audio, sessionId, language = 'auto' } = await req.json();
     
     if (!audio) {
       throw new Error('No audio data provided');
@@ -68,6 +68,12 @@ serve(async (req) => {
     formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'verbose_json'); // Get detailed output with timestamps
+    formData.append('timestamp_granularities[]', 'segment');
+    
+    // Add language if specified
+    if (language && language !== 'auto') {
+      formData.append('language', language);
+    }
 
     console.log(`Sending audio to OpenAI Whisper API...`);
 
@@ -89,12 +95,29 @@ serve(async (req) => {
     const result = await response.json();
     console.log(`Transcription completed. Text length: ${result.text?.length || 0}`);
 
+    // Calculate average confidence if segments are available
+    let averageConfidence = null;
+    if (result.segments && result.segments.length > 0) {
+      const totalConfidence = result.segments.reduce((sum: number, seg: any) => {
+        // Whisper returns avg_logprob, convert to probability
+        const confidence = seg.avg_logprob ? Math.exp(seg.avg_logprob) : 0;
+        return sum + confidence;
+      }, 0);
+      averageConfidence = totalConfidence / result.segments.length;
+    }
+
     return new Response(
       JSON.stringify({ 
         text: result.text,
         language: result.language,
         duration: result.duration,
-        segments: result.segments // Includes word-level timestamps if available
+        segments: result.segments?.map((seg: any) => ({
+          text: seg.text,
+          start: seg.start,
+          end: seg.end,
+          confidence: seg.avg_logprob ? Math.exp(seg.avg_logprob) : null
+        })),
+        averageConfidence
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

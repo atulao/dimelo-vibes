@@ -12,6 +12,9 @@ interface TranscriptSegment {
   id: string;
   text: string;
   timestamp: string;
+  confidence?: number;
+  start?: number;
+  end?: number;
 }
 
 export default function RecordingTest() {
@@ -31,6 +34,8 @@ export default function RecordingTest() {
   const [isPeaking, setIsPeaking] = useState(false);
   const [sampleRate, setSampleRate] = useState<number>(0);
   const [isBrowserSupported, setIsBrowserSupported] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState("auto");
+  const [averageConfidence, setAverageConfidence] = useState<number | null>(null);
   
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -39,6 +44,7 @@ export default function RecordingTest() {
   const animationFrameRef = useRef<number>();
   const timerIntervalRef = useRef<NodeJS.Timeout>();
   const streamRef = useRef<MediaStream | null>(null);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   // Check browser support
   useEffect(() => {
@@ -263,6 +269,7 @@ export default function RecordingTest() {
             body: JSON.stringify({
               audio: base64Audio,
               sessionId: 'test-session',
+              language: selectedLanguage,
             }),
           }
         );
@@ -274,7 +281,36 @@ export default function RecordingTest() {
 
         const data = await response.json();
         
-        if (data.text) {
+        if (data.segments && data.segments.length > 0) {
+          const newSegments: TranscriptSegment[] = data.segments.map((seg: any, index: number) => ({
+            id: `${Date.now()}-${index}`,
+            text: seg.text,
+            timestamp: new Date(seg.start * 1000).toISOString().substr(14, 5),
+            confidence: seg.confidence,
+            start: seg.start,
+            end: seg.end,
+          }));
+          
+          setTranscriptSegments(prev => [...prev, ...newSegments]);
+          
+          if (data.averageConfidence !== null) {
+            setAverageConfidence(data.averageConfidence);
+            
+            if (data.averageConfidence < 0.8) {
+              toast({
+                title: "Low Confidence Warning",
+                description: `Average confidence: ${(data.averageConfidence * 100).toFixed(0)}%. Audio quality may be poor.`,
+                variant: "destructive",
+              });
+            }
+          }
+          
+          toast({
+            title: "Transcription Complete",
+            description: `Detected language: ${data.language || 'Unknown'}`,
+          });
+        } else if (data.text) {
+          // Fallback for single text response
           const newSegment: TranscriptSegment = {
             id: Date.now().toString(),
             text: data.text,
@@ -306,10 +342,18 @@ export default function RecordingTest() {
 
   const clearTranscript = () => {
     setTranscriptSegments([]);
+    setAverageConfidence(null);
     toast({
       title: "Transcript Cleared",
     });
   };
+
+  // Auto-scroll to latest segment
+  useEffect(() => {
+    if (transcriptEndRef.current) {
+      transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [transcriptSegments]);
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -356,6 +400,27 @@ export default function RecordingTest() {
                       {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Language</label>
+              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto-detect</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="es">Spanish</SelectItem>
+                  <SelectItem value="fr">French</SelectItem>
+                  <SelectItem value="de">German</SelectItem>
+                  <SelectItem value="it">Italian</SelectItem>
+                  <SelectItem value="pt">Portuguese</SelectItem>
+                  <SelectItem value="zh">Chinese</SelectItem>
+                  <SelectItem value="ja">Japanese</SelectItem>
+                  <SelectItem value="ko">Korean</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -512,7 +577,23 @@ export default function RecordingTest() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Transcript</CardTitle>
+            <div>
+              <CardTitle>Transcript</CardTitle>
+              {averageConfidence !== null && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-sm text-muted-foreground">Average Confidence:</span>
+                  <Badge variant={averageConfidence >= 0.8 ? "default" : "destructive"}>
+                    {(averageConfidence * 100).toFixed(0)}%
+                  </Badge>
+                  {averageConfidence < 0.8 && (
+                    <Badge variant="outline" className="text-xs">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Low Quality
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
             {transcriptSegments.length > 0 && (
               <Button onClick={clearTranscript} variant="outline" size="sm">
                 Clear
@@ -525,18 +606,40 @@ export default function RecordingTest() {
                 No transcript yet. Start recording to see results here.
               </p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
                 {transcriptSegments.map((segment) => (
                   <div
                     key={segment.id}
-                    className="p-4 border rounded-lg space-y-2 animate-fade-in"
+                    className={`p-4 border rounded-lg space-y-2 animate-fade-in transition-colors ${
+                      segment.confidence && segment.confidence < 0.7 
+                        ? 'border-destructive/50 bg-destructive/5' 
+                        : ''
+                    }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{segment.timestamp}</Badge>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {segment.timestamp}
+                        </Badge>
+                        {segment.confidence !== undefined && (
+                          <Badge 
+                            variant={segment.confidence >= 0.7 ? "outline" : "destructive"}
+                            className="text-xs"
+                          >
+                            {(segment.confidence * 100).toFixed(0)}% confidence
+                          </Badge>
+                        )}
+                      </div>
+                      {segment.start !== undefined && segment.end !== undefined && (
+                        <span className="text-xs text-muted-foreground">
+                          {segment.start.toFixed(1)}s - {segment.end.toFixed(1)}s
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm leading-relaxed">{segment.text}</p>
                   </div>
                 ))}
+                <div ref={transcriptEndRef} />
               </div>
             )}
           </CardContent>
