@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export const Navigation = () => {
   const { role, user, loading } = useUserRole();
@@ -127,7 +128,7 @@ export const Navigation = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             {!user ? (
               <>
                 <Button variant="ghost" size="sm" asChild>
@@ -138,7 +139,9 @@ export const Navigation = () => {
                 </Button>
               </>
             ) : (
-              <DropdownMenu>
+              <>
+                <NotificationBell userId={user?.id} />
+                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2">
                     <User className="h-4 w-4" />
@@ -189,6 +192,7 @@ export const Navigation = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             )}
           </div>
         </div>

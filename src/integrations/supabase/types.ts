@@ -93,6 +93,39 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          link: string | null
+          message: string
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message: string
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message?: string
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           created_at: string
@@ -430,6 +463,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "organizer" | "attendee"
+      notification_type:
+        | "session_starting"
+        | "question_asked"
+        | "session_ended"
+        | "new_insight"
+        | "question_upvoted"
       session_status: "draft" | "scheduled" | "live" | "completed" | "cancelled"
     }
     CompositeTypes: {
@@ -559,6 +598,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "organizer", "attendee"],
+      notification_type: [
+        "session_starting",
+        "question_asked",
+        "session_ended",
+        "new_insight",
+        "question_upvoted",
+      ],
       session_status: ["draft", "scheduled", "live", "completed", "cancelled"],
     },
   },
