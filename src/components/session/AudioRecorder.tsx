@@ -1,3 +1,4 @@
+// Audio recorder component with speaker tracking
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
