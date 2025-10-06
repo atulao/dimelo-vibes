@@ -16,6 +16,7 @@ import SessionLive from "./pages/SessionLive";
 import SessionReplay from "./pages/SessionReplay";
 import SpeakerSessions from "./pages/SpeakerSessions";
 import SessionAnalyticsPage from "./pages/SessionAnalyticsPage";
+import RecordingTest from "./pages/RecordingTest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/session/:id/replay" element={<SessionReplay />} />
           <Route path="/session/:id/analytics" element={<SessionAnalyticsPage />} />
           <Route path="/speaker/sessions" element={<SpeakerSessions />} />
+          <Route path="/recording-test" element={<RecordingTest />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

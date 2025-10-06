@@ -200,6 +200,10 @@ const Dashboard = () => {
               <Calendar className="mr-2 h-4 w-4" />
               View All Conferences
             </Button>
+            <Button className="w-full justify-start" variant="outline" onClick={() => navigate("/recording-test")}>
+              <Mic className="mr-2 h-4 w-4" />
+              Test Recording
+            </Button>
           </CardContent>
         </Card>
 
