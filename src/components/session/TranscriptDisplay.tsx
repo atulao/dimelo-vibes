@@ -1,16 +1,17 @@
-import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Play } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FileText, Play } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface TranscriptSegment {
   id: string;
   text: string;
-  start_time: number;
+  speaker_label: string | null;
+  start_time: number | null;
   created_at: string;
-  speaker_label?: string;
 }
 
 interface TranscriptDisplayProps {
@@ -19,97 +20,172 @@ interface TranscriptDisplayProps {
 
 export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
-  const [isDemo, setIsDemo] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isDemoRunning, setIsDemoRunning] = useState(false);
+  const [wordCount, setWordCount] = useState(0);
+  const [lastGeneratedAt, setLastGeneratedAt] = useState(0);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const demoIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    fetchTranscripts();
+    fetchSegments();
     
-    // Poll for new transcripts every 5 seconds
-    const interval = setInterval(fetchTranscripts, 5000);
-    
-    return () => {
-      clearInterval(interval);
-      if (demoIntervalRef.current) {
-        clearInterval(demoIntervalRef.current);
-      }
-    };
+    const interval = setInterval(fetchSegments, 5000);
+    return () => clearInterval(interval);
   }, [sessionId]);
 
   useEffect(() => {
-    // Auto-scroll to bottom when new segments arrive
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [segments]);
 
-  const fetchTranscripts = async () => {
+  useEffect(() => {
+    // Calculate word count from all segments
+    const totalWords = segments.reduce((count, segment) => {
+      return count + segment.text.split(/\s+/).length;
+    }, 0);
+    
+    setWordCount(totalWords);
+
+    // Auto-generate insights at thresholds
+    if (totalWords >= 500 && lastGeneratedAt === 0) {
+      generateInsights(totalWords);
+    } else if (totalWords >= lastGeneratedAt + 1000 && lastGeneratedAt > 0) {
+      generateInsights(totalWords);
+    }
+  }, [segments]);
+
+  const generateInsights = async (currentWordCount: number) => {
+    if (isGeneratingInsights) return;
+
+    setIsGeneratingInsights(true);
+    try {
+      const transcriptText = segments.map(s => s.text).join(" ");
+
+      console.log(`Generating insights for ${currentWordCount} words...`);
+
+      const { data, error } = await supabase.functions.invoke('generate-insights', {
+        body: { 
+          session_id: sessionId, 
+          transcript_text: transcriptText 
+        }
+      });
+
+      if (error) {
+        console.error('Error generating insights:', error);
+        throw error;
+      }
+
+      console.log('Insights generated successfully:', data);
+      setLastGeneratedAt(currentWordCount);
+
+      toast({
+        title: "Insights Updated",
+        description: "AI insights have been generated from the transcript.",
+      });
+    } catch (error: any) {
+      console.error("Error generating insights:", error);
+      // Don't show error toast for auto-generation failures
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const fetchSegments = async () => {
     try {
       const { data, error } = await supabase
         .from("transcript_segments")
         .select("*")
         .eq("session_id", sessionId)
-        .order("start_time", { ascending: true });
+        .order("created_at", { ascending: true });
 
       if (error) throw error;
-      if (data) setSegments(data);
+      setSegments(data || []);
     } catch (error) {
-      console.error("Error fetching transcripts:", error);
+      console.error("Error fetching transcript:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const startDemoTranscript = () => {
-    setIsDemo(true);
-    
-    const demoTexts = [
-      "Welcome everyone to today's session on real-time AI transcription.",
-      "We're going to explore how artificial intelligence can enhance conference experiences.",
-      "One of the key challenges at conferences is information overload.",
-      "With live transcription, attendees never miss important moments.",
-      "The system captures every word spoken during the session.",
-      "AI then processes this information to generate insights and summaries.",
-      "This allows participants to focus on networking and engagement.",
-      "Rather than frantically trying to take notes on everything.",
-      "Questions can be submitted in real-time through the platform.",
-      "And speakers can address them without interrupting the flow.",
+  const startDemoTranscript = async () => {
+    setIsDemoRunning(true);
+    toast({
+      title: "Demo Started",
+      description: "Simulating live transcript...",
+    });
+
+    const demoSegments = [
+      "Welcome everyone to today's session on modern web development.",
+      "We'll be covering React, TypeScript, and best practices for building scalable applications.",
+      "Let's start with the fundamentals of component architecture.",
+      "State management is crucial for maintaining data flow in your application.",
+      "We'll explore different patterns and when to use each one.",
+      "Performance optimization becomes important as your app grows.",
+      "Let's look at some practical examples of code splitting and lazy loading.",
+      "Testing is an essential part of the development workflow.",
+      "We'll cover unit tests, integration tests, and end-to-end testing strategies.",
+      "Thank you all for attending. Feel free to ask questions in the Q&A section.",
     ];
 
-    let index = 0;
-    demoIntervalRef.current = setInterval(() => {
-      if (index >= demoTexts.length) {
-        if (demoIntervalRef.current) {
-          clearInterval(demoIntervalRef.current);
-        }
-        return;
+    for (let i = 0; i < demoSegments.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      const { error } = await supabase
+        .from("transcript_segments")
+        .insert({
+          session_id: sessionId,
+          text: demoSegments[i],
+          speaker_label: "Speaker",
+          start_time: i * 3,
+        });
+
+      if (error) {
+        console.error("Error inserting demo segment:", error);
       }
+      
+      await fetchSegments();
+    }
 
-      const newSegment: TranscriptSegment = {
-        id: `demo-${Date.now()}-${index}`,
-        text: demoTexts[index],
-        start_time: index * 3,
-        created_at: new Date().toISOString(),
-        speaker_label: "Speaker",
-      };
-
-      setSegments((prev) => [...prev, newSegment]);
-      index++;
-    }, 3000);
+    setIsDemoRunning(false);
+    toast({
+      title: "Demo Complete",
+      description: "Demo transcript finished.",
+    });
   };
 
-  const formatTime = (seconds: number) => {
+  const formatTime = (seconds: number | null) => {
+    if (seconds === null) return "";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader>
+      <CardHeader className="flex-shrink-0">
         <div className="flex items-center justify-between">
-          <CardTitle>Live Transcript</CardTitle>
-          {segments.length === 0 && !isDemo && (
-            <Button onClick={startDemoTranscript} variant="outline" size="sm">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Live Transcript
+            </CardTitle>
+            {wordCount > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {wordCount} words
+                {isGeneratingInsights && " • Generating insights..."}
+              </p>
+            )}
+          </div>
+          {segments.length === 0 && !isDemoRunning && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={startDemoTranscript}
+              disabled={isDemoRunning}
+            >
               <Play className="mr-2 h-4 w-4" />
               Start Demo
             </Button>
@@ -117,31 +193,38 @@ export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-0">
-        <ScrollArea className="h-full px-6 pb-6" ref={scrollRef}>
-          {segments.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Waiting for transcript...</p>
-              <p className="text-sm mt-2">Click "Start Demo" to see how it works</p>
+        <div 
+          ref={scrollRef}
+          className="h-full overflow-y-auto px-6 pb-6 space-y-4"
+        >
+          {loading ? (
+            <>
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </>
+          ) : segments.length === 0 ? (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-sm text-muted-foreground text-center">
+                Transcript will appear here when the session starts...
+              </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {segments.map((segment, index) => (
-                <div
-                  key={segment.id}
-                  className="p-4 rounded-lg bg-muted/50 animate-in fade-in slide-in-from-bottom-4"
-                  style={{ animationDuration: "500ms" }}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="text-xs font-mono text-muted-foreground min-w-[3rem]">
-                      {formatTime(segment.start_time)}
-                    </span>
-                    <p className="text-sm leading-relaxed flex-1">{segment.text}</p>
-                  </div>
+            segments.map((segment) => (
+              <div key={segment.id} className="space-y-1">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {segment.speaker_label && (
+                    <span className="font-medium">{segment.speaker_label}</span>
+                  )}
+                  {segment.start_time !== null && (
+                    <span>{formatTime(segment.start_time)}</span>
+                  )}
                 </div>
-              ))}
-            </div>
+                <p className="text-sm leading-relaxed">{segment.text}</p>
+              </div>
+            ))
           )}
-        </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );

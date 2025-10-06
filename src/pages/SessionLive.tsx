@@ -117,7 +117,7 @@ const SessionLive = () => {
                 onStatusChange={checkAuthAndFetch}
               />
             )}
-            <AIInsightsPanel sessionId={id!} />
+            <AIInsightsPanel sessionId={id!} canRegenerate={isSpeaker} />
             <QASection sessionId={id!} />
           </div>
         </div>
@@ -139,7 +139,7 @@ const SessionLive = () => {
           </div>
 
           {/* AI Insights */}
-          <AIInsightsPanel sessionId={id!} />
+          <AIInsightsPanel sessionId={id!} canRegenerate={isSpeaker} />
 
           {/* Q&A */}
           <QASection sessionId={id!} />
