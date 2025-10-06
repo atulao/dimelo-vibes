@@ -37,8 +37,50 @@ export const QASection = ({ sessionId }: QASectionProps) => {
     checkOrganizerStatus();
     fetchQuestions();
     
-    const interval = setInterval(fetchQuestions, 5000);
-    return () => clearInterval(interval);
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel(`questions_${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'questions',
+          filter: `session_id=eq.${sessionId}`
+        },
+        (payload) => {
+          setQuestions(prev => {
+            const newQuestions = [...prev, payload.new as Question];
+            return newQuestions.sort((a, b) => {
+              if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            });
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'questions',
+          filter: `session_id=eq.${sessionId}`
+        },
+        (payload) => {
+          setQuestions(prev => {
+            const updated = prev.map(q => q.id === payload.new.id ? payload.new as Question : q);
+            return updated.sort((a, b) => {
+              if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            });
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [sessionId]);
 
   const checkOrganizerStatus = async () => {
@@ -129,7 +171,6 @@ export const QASection = ({ sessionId }: QASectionProps) => {
       });
       
       setQuestion("");
-      fetchQuestions();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -147,7 +188,10 @@ export const QASection = ({ sessionId }: QASectionProps) => {
       setQuestions(prev =>
         prev.map(q =>
           q.id === questionId ? { ...q, upvotes: currentUpvotes + 1 } : q
-        )
+        ).sort((a, b) => {
+          if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        })
       );
 
       const { error } = await supabase
@@ -157,12 +201,17 @@ export const QASection = ({ sessionId }: QASectionProps) => {
 
       if (error) throw error;
     } catch (error: any) {
+      // Revert on error
+      setQuestions(prev =>
+        prev.map(q =>
+          q.id === questionId ? { ...q, upvotes: currentUpvotes } : q
+        )
+      );
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-      fetchQuestions();
     }
   };
 
@@ -189,12 +238,17 @@ export const QASection = ({ sessionId }: QASectionProps) => {
         title: currentStatus ? "Marked as Unanswered" : "Marked as Answered",
       });
     } catch (error: any) {
+      // Revert on error
+      setQuestions(prev =>
+        prev.map(q =>
+          q.id === questionId ? { ...q, is_answered: currentStatus } : q
+        )
+      );
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
-      fetchQuestions();
     }
   };
 
@@ -237,7 +291,7 @@ export const QASection = ({ sessionId }: QASectionProps) => {
               {questions.map((q) => (
                 <Card 
                   key={q.id} 
-                  className={!q.is_answered && isOrganizer ? "border-primary/50" : ""}
+                  className={`animate-fade-in ${!q.is_answered && isOrganizer ? "border-primary/50" : ""}`}
                 >
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-start justify-between gap-3">
@@ -247,13 +301,13 @@ export const QASection = ({ sessionId }: QASectionProps) => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleUpvote(q.id, q.upvotes)}
-                          className="flex items-center gap-1"
+                          className="flex items-center gap-1 hover-scale"
                         >
                           <ThumbsUp className="h-4 w-4" />
-                          <span className="text-xs">{q.upvotes}</span>
+                          <span className="text-xs transition-all duration-200">{q.upvotes}</span>
                         </Button>
                         {q.is_answered && (
-                          <Badge variant="secondary" className="bg-green-500/10 text-green-700">
+                          <Badge variant="secondary" className="bg-green-500/10 text-green-700 animate-fade-in">
                             <Check className="h-3 w-3 mr-1" />
                             Answered
                           </Badge>
