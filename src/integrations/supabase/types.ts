@@ -24,6 +24,8 @@ export type Database = {
           search_vector: unknown | null
           session_id: string
           session_status: string | null
+          timestamp_seconds: number | null
+          transcript_segment_id: string | null
           transcript_version: number | null
           updated_at: string | null
         }
@@ -36,6 +38,8 @@ export type Database = {
           search_vector?: unknown | null
           session_id: string
           session_status?: string | null
+          timestamp_seconds?: number | null
+          transcript_segment_id?: string | null
           transcript_version?: number | null
           updated_at?: string | null
         }
@@ -48,6 +52,8 @@ export type Database = {
           search_vector?: unknown | null
           session_id?: string
           session_status?: string | null
+          timestamp_seconds?: number | null
+          transcript_segment_id?: string | null
           transcript_version?: number | null
           updated_at?: string | null
         }
@@ -57,6 +63,13 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_insights_transcript_segment_id_fkey"
+            columns: ["transcript_segment_id"]
+            isOneToOne: false
+            referencedRelation: "transcript_segments"
             referencedColumns: ["id"]
           },
         ]

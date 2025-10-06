@@ -142,6 +142,28 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
     }
   };
 
+  const formatTimestamp = (seconds: number | null) => {
+    if (seconds === null) return '';
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleTimestampClick = (timestamp: number) => {
+    if (typeof (window as any).scrollToTranscriptTimestamp === 'function') {
+      (window as any).scrollToTranscriptTimestamp(timestamp);
+      toast({
+        title: "Navigating to transcript",
+        description: `Jumping to ${formatTimestamp(timestamp)}`,
+      });
+    }
+  };
+
   const getTimeAgo = (date: Date) => {
     const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
     
@@ -250,7 +272,17 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
                   {keyPoints.slice(0, 7).map((insight) => (
                     <li key={insight.id} className="flex items-start gap-2">
                       <span className="text-primary mt-0.5">•</span>
-                      <span className="text-muted-foreground">{insight.content}</span>
+                      <span className="text-muted-foreground flex-1">
+                        {insight.content}
+                        {insight.timestamp_seconds && (
+                          <button
+                            onClick={() => handleTimestampClick(insight.timestamp_seconds)}
+                            className="ml-2 text-xs text-primary hover:underline font-mono"
+                          >
+                            [{formatTimestamp(insight.timestamp_seconds)}]
+                          </button>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -268,7 +300,17 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
                   {actionItems.slice(0, 5).map((insight) => (
                     <li key={insight.id} className="flex items-start gap-2">
                       <span className="text-primary mt-0.5">→</span>
-                      <span className="text-muted-foreground">{insight.content}</span>
+                      <span className="text-muted-foreground flex-1">
+                        {insight.content}
+                        {insight.timestamp_seconds && (
+                          <button
+                            onClick={() => handleTimestampClick(insight.timestamp_seconds)}
+                            className="ml-2 text-xs text-primary hover:underline font-mono"
+                          >
+                            [{formatTimestamp(insight.timestamp_seconds)}]
+                          </button>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -291,6 +333,14 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
                       <p className="text-sm italic text-muted-foreground">
                         "{insight.content}"
                       </p>
+                      {insight.timestamp_seconds && (
+                        <button
+                          onClick={() => handleTimestampClick(insight.timestamp_seconds)}
+                          className="mt-2 text-xs text-primary hover:underline font-mono"
+                        >
+                          [{formatTimestamp(insight.timestamp_seconds)}]
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -37,7 +37,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { session_id, transcript_text, session_status } = await req.json();
+    const { session_id, transcript_text, session_status, transcript_segments } = await req.json();
 
     // Input validation
     if (!session_id || !transcript_text || typeof transcript_text !== 'string') {
@@ -193,16 +193,31 @@ serve(async (req) => {
     let userPrompt: string;
     
     if (isFirstGeneration) {
-      userPrompt = `Analyze this conference session transcript and provide insights in the following JSON format:
+      userPrompt = `Analyze this conference session transcript and provide insights in the following JSON format.
+
+For EACH insight (key_points, action_items, quotes), identify the approximate timestamp in seconds where that insight occurs in the transcript.
+
 {
   "summary": "A 2-3 sentence summary",
-  "key_points": ["point 1", "point 2", "point 3", "point 4", "point 5"],
-  "action_items": ["action 1", "action 2", "action 3"],
-  "notable_quotes": ["quote 1", "quote 2", "quote 3"]
+  "key_points": [
+    {"text": "point 1", "timestamp": 45},
+    {"text": "point 2", "timestamp": 120},
+    {"text": "point 3", "timestamp": 180}
+  ],
+  "action_items": [
+    {"text": "action 1", "timestamp": 200},
+    {"text": "action 2", "timestamp": 300}
+  ],
+  "notable_quotes": [
+    {"text": "quote 1", "timestamp": 90},
+    {"text": "quote 2", "timestamp": 240}
+  ]
 }
 
 Transcript to analyze (${currentWordCount} words):
-${newTranscript}`;
+${newTranscript}
+
+${transcript_segments ? `\n\nTIMESTAMP REFERENCE:\n${transcript_segments.map((s: any, i: number) => `[${s.start_time}s] ${s.text.substring(0, 60)}...`).join('\n')}` : ''}`;
     } else {
       userPrompt = `Update the existing insights based on new transcript content.
 
@@ -212,12 +227,21 @@ ${JSON.stringify(previousInsightsContext, null, 2)}
 NEW TRANSCRIPT CONTENT (${newWordCount} new words):
 ${newTranscript}
 
-Provide UPDATED insights in the same JSON format, incorporating the new information:
+${transcript_segments ? `\n\nNEW SEGMENT TIMESTAMPS:\n${transcript_segments.slice(-10).map((s: any) => `[${s.start_time}s] ${s.text.substring(0, 60)}...`).join('\n')}` : ''}
+
+Provide UPDATED insights in the same JSON format, incorporating the new information.
+For new insights, add timestamps. For existing insights, keep their timestamps:
 {
   "summary": "Updated 2-3 sentence summary that incorporates new content",
-  "key_points": ["updated or new points"],
-  "action_items": ["updated or new action items"],
-  "notable_quotes": ["updated or new quotes"]
+  "key_points": [
+    {"text": "updated or new point", "timestamp": 180}
+  ],
+  "action_items": [
+    {"text": "updated or new action", "timestamp": 300}
+  ],
+  "notable_quotes": [
+    {"text": "updated or new quote", "timestamp": 240}
+  ]
 }
 
 Keep the best insights from before and add new ones from this segment.`;
@@ -344,26 +368,29 @@ Keep the best insights from before and add new ones from this segment.`;
         transcript_version: newVersion,
         session_status: session_status || 'in_progress'
       },
-      ...(insights.key_points || []).map((point: string) => ({
+      ...(insights.key_points || []).map((point: any) => ({
         session_id,
         insight_type: 'key_point',
-        content: point,
+        content: typeof point === 'string' ? point : point.text,
+        timestamp_seconds: typeof point === 'object' ? point.timestamp : null,
         last_processed_word_count: currentWordCount,
         transcript_version: newVersion,
         session_status: session_status || 'in_progress'
       })),
-      ...(insights.action_items || []).map((item: string) => ({
+      ...(insights.action_items || []).map((item: any) => ({
         session_id,
         insight_type: 'action_item',
-        content: item,
+        content: typeof item === 'string' ? item : item.text,
+        timestamp_seconds: typeof item === 'object' ? item.timestamp : null,
         last_processed_word_count: currentWordCount,
         transcript_version: newVersion,
         session_status: session_status || 'in_progress'
       })),
-      ...(insights.notable_quotes || []).map((quote: string) => ({
+      ...(insights.notable_quotes || []).map((quote: any) => ({
         session_id,
         insight_type: 'quote',
-        content: quote,
+        content: typeof quote === 'string' ? quote : quote.text,
+        timestamp_seconds: typeof quote === 'object' ? quote.timestamp : null,
         last_processed_word_count: currentWordCount,
         transcript_version: newVersion,
         session_status: session_status || 'in_progress'

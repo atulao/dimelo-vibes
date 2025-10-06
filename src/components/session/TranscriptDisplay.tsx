@@ -16,9 +16,10 @@ interface TranscriptSegment {
 
 interface TranscriptDisplayProps {
   sessionId: string;
+  onScrollToTimestamp?: (timestamp: number) => void;
 }
 
-export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
+export const TranscriptDisplay = ({ sessionId, onScrollToTimestamp }: TranscriptDisplayProps) => {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -92,7 +93,12 @@ export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
         body: { 
           session_id: sessionId, 
           transcript_text: transcriptText,
-          session_status: 'live' // Can be updated based on actual session status
+          transcript_segments: segments.map(s => ({
+            id: s.id,
+            text: s.text,
+            start_time: s.start_time
+          })),
+          session_status: 'live'
         }
       });
 
@@ -124,6 +130,34 @@ export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
       setIsGeneratingInsights(false);
     }
   };
+
+  const scrollToTimestamp = (targetTimestamp: number) => {
+    if (!scrollRef.current) return;
+
+    // Find the segment closest to the target timestamp
+    const targetIndex = segments.findIndex(s => 
+      s.start_time !== null && s.start_time >= targetTimestamp
+    );
+    
+    if (targetIndex >= 0) {
+      const targetElement = scrollRef.current.querySelector(`[data-segment-index="${targetIndex}"]`);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Highlight the segment briefly
+        targetElement.classList.add('bg-primary/10');
+        setTimeout(() => {
+          targetElement.classList.remove('bg-primary/10');
+        }, 2000);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (onScrollToTimestamp) {
+      // Expose scroll function to parent
+      (window as any).scrollToTranscriptTimestamp = scrollToTimestamp;
+    }
+  }, [segments, onScrollToTimestamp]);
 
   const fetchSegments = async () => {
     try {
@@ -242,8 +276,13 @@ export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
               </p>
             </div>
           ) : (
-            segments.map((segment) => (
-              <div key={segment.id} className="space-y-1">
+            segments.map((segment, index) => (
+              <div 
+                key={segment.id} 
+                className="space-y-1 transition-colors duration-300"
+                data-segment-index={index}
+                data-timestamp={segment.start_time}
+              >
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {segment.speaker_label && (
                     <span className="font-medium">{segment.speaker_label}</span>
