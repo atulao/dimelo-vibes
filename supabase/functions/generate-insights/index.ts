@@ -13,6 +13,9 @@ const corsHeaders = {
 
 const MAX_TRANSCRIPT_LENGTH = 50000;
 const MIN_TRANSCRIPT_LENGTH = 10;
+const INITIAL_WORD_THRESHOLD = 200; // Generate first insights at 200 words
+const UPDATE_WORD_THRESHOLD = 300; // Update every 300 new words
+const MODEL_SWITCH_THRESHOLD = 500; // Switch to better model after 500 words
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -34,7 +37,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { session_id, transcript_text } = await req.json();
+    const { session_id, transcript_text, session_status } = await req.json();
 
     // Input validation
     if (!session_id || !transcript_text || typeof transcript_text !== 'string') {
@@ -56,6 +59,39 @@ serve(async (req) => {
     if (transcript_text.length < MIN_TRANSCRIPT_LENGTH) {
       return new Response(JSON.stringify({ error: 'Transcript too short' }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Calculate current word count
+    const currentWordCount = transcript_text.split(/\s+/).length;
+
+    // Get latest insights to check if incremental update is needed
+    const { data: latestInsights, error: insightsError } = await supabase
+      .from('ai_insights')
+      .select('last_processed_word_count, transcript_version, session_status, insight_type, content')
+      .eq('session_id', session_id)
+      .order('transcript_version', { ascending: false })
+      .limit(10);
+
+    const lastProcessedWordCount = latestInsights?.[0]?.last_processed_word_count || 0;
+    const lastVersion = latestInsights?.[0]?.transcript_version || 0;
+    const newWordCount = currentWordCount - lastProcessedWordCount;
+
+    // Determine if we should process based on thresholds
+    const isFirstGeneration = lastProcessedWordCount === 0;
+    const isSessionCompleted = session_status === 'completed';
+    const hasEnoughNewWords = newWordCount >= UPDATE_WORD_THRESHOLD;
+    const meetsInitialThreshold = isFirstGeneration && currentWordCount >= INITIAL_WORD_THRESHOLD;
+
+    if (!isSessionCompleted && !meetsInitialThreshold && !hasEnoughNewWords) {
+      return new Response(JSON.stringify({ 
+        message: 'Not enough new content for update',
+        current_words: currentWordCount,
+        new_words: newWordCount,
+        threshold: UPDATE_WORD_THRESHOLD
+      }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -111,16 +147,34 @@ serve(async (req) => {
       });
     }
 
-    // Sanitize transcript
+    // Prepare transcript for processing
     const sanitizedTranscript = transcript_text
       .replace(/\u0000/g, '')
       .slice(0, MAX_TRANSCRIPT_LENGTH);
+
+    // For incremental updates, extract only new content
+    const words = sanitizedTranscript.split(/\s+/);
+    const newTranscript = isFirstGeneration 
+      ? sanitizedTranscript 
+      : words.slice(lastProcessedWordCount).join(' ');
+
+    // Prepare previous insights context for incremental updates
+    const previousInsightsContext = !isFirstGeneration && latestInsights ? {
+      summary: latestInsights.find(i => i.insight_type === 'summary')?.content || '',
+      key_points: latestInsights.filter(i => i.insight_type === 'key_point').map(i => i.content),
+      action_items: latestInsights.filter(i => i.insight_type === 'action_item').map(i => i.content),
+      notable_quotes: latestInsights.filter(i => i.insight_type === 'notable_quote').map(i => i.content)
+    } : null;
 
     // Structured logging (no sensitive content)
     console.log(JSON.stringify({
       event: 'insight_generation_start',
       session_id,
-      transcript_length: sanitizedTranscript.length,
+      is_incremental: !isFirstGeneration,
+      current_word_count: currentWordCount,
+      last_processed: lastProcessedWordCount,
+      new_words: newWordCount,
+      version: lastVersion + 1,
       timestamp: new Date().toISOString(),
     }));
 
@@ -131,6 +185,44 @@ serve(async (req) => {
       });
     }
 
+    // Select model based on content size and type
+    const shouldUseBetterModel = isSessionCompleted && currentWordCount > MODEL_SWITCH_THRESHOLD;
+    const modelToUse = shouldUseBetterModel ? 'gpt-5-mini-2025-08-07' : 'gpt-5-mini-2025-08-07';
+
+    // Prepare prompt based on whether this is incremental or initial
+    let userPrompt: string;
+    
+    if (isFirstGeneration) {
+      userPrompt = `Analyze this conference session transcript and provide insights in the following JSON format:
+{
+  "summary": "A 2-3 sentence summary",
+  "key_points": ["point 1", "point 2", "point 3", "point 4", "point 5"],
+  "action_items": ["action 1", "action 2", "action 3"],
+  "notable_quotes": ["quote 1", "quote 2", "quote 3"]
+}
+
+Transcript to analyze (${currentWordCount} words):
+${newTranscript}`;
+    } else {
+      userPrompt = `Update the existing insights based on new transcript content.
+
+PREVIOUS INSIGHTS:
+${JSON.stringify(previousInsightsContext, null, 2)}
+
+NEW TRANSCRIPT CONTENT (${newWordCount} new words):
+${newTranscript}
+
+Provide UPDATED insights in the same JSON format, incorporating the new information:
+{
+  "summary": "Updated 2-3 sentence summary that incorporates new content",
+  "key_points": ["updated or new points"],
+  "action_items": ["updated or new action items"],
+  "notable_quotes": ["updated or new quotes"]
+}
+
+Keep the best insights from before and add new ones from this segment.`;
+    }
+
     // Call OpenAI API
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -139,7 +231,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+        model: modelToUse,
         messages: [
           {
             role: 'system',
@@ -147,19 +239,10 @@ serve(async (req) => {
           },
           {
             role: 'user',
-            content: `Analyze this conference session transcript and provide insights in the following JSON format:
-{
-  "summary": "A 2-3 sentence summary",
-  "key_points": ["point 1", "point 2", "point 3", "point 4", "point 5"],
-  "action_items": ["action 1", "action 2", "action 3"],
-  "notable_quotes": ["quote 1", "quote 2", "quote 3"]
-}
-
-Transcript to analyze:
-${sanitizedTranscript}`
+            content: userPrompt
           }
         ],
-        max_completion_tokens: 1000,
+        max_completion_tokens: isFirstGeneration ? 1000 : 1200,
       }),
     });
 
@@ -217,41 +300,73 @@ ${sanitizedTranscript}`
     // Use service role client for database operations
     const dbClient = createClient(supabaseUrl, supabaseKey);
 
-    // Delete existing insights for this session
-    const { error: deleteError } = await dbClient
-      .from('ai_insights')
-      .delete()
-      .eq('session_id', session_id);
+    // Delete OLD insights for this session (keep history by not deleting all)
+    // Only delete if this is a fresh start or session completed
+    if (isFirstGeneration || isSessionCompleted) {
+      const { error: deleteError } = await dbClient
+        .from('ai_insights')
+        .delete()
+        .eq('session_id', session_id);
 
-    if (deleteError) {
-      console.error(JSON.stringify({
-        event: 'delete_error',
-        session_id,
-        timestamp: new Date().toISOString(),
-      }));
+      if (deleteError) {
+        console.error(JSON.stringify({
+          event: 'delete_error',
+          session_id,
+          timestamp: new Date().toISOString(),
+        }));
+      }
+    } else {
+      // For incremental updates, delete only the previous version's insights
+      const { error: deleteError } = await dbClient
+        .from('ai_insights')
+        .delete()
+        .eq('session_id', session_id)
+        .eq('transcript_version', lastVersion);
+
+      if (deleteError) {
+        console.error(JSON.stringify({
+          event: 'incremental_delete_error',
+          session_id,
+          version: lastVersion,
+          timestamp: new Date().toISOString(),
+        }));
+      }
     }
 
-    // Store insights in database
+    // Store insights in database with tracking metadata
+    const newVersion = lastVersion + 1;
     const insightsToStore = [
       {
         session_id,
         insight_type: 'summary',
-        content: insights.summary || ''
+        content: insights.summary || '',
+        last_processed_word_count: currentWordCount,
+        transcript_version: newVersion,
+        session_status: session_status || 'in_progress'
       },
       ...(insights.key_points || []).map((point: string) => ({
         session_id,
         insight_type: 'key_point',
-        content: point
+        content: point,
+        last_processed_word_count: currentWordCount,
+        transcript_version: newVersion,
+        session_status: session_status || 'in_progress'
       })),
       ...(insights.action_items || []).map((item: string) => ({
         session_id,
         insight_type: 'action_item',
-        content: item
+        content: item,
+        last_processed_word_count: currentWordCount,
+        transcript_version: newVersion,
+        session_status: session_status || 'in_progress'
       })),
       ...(insights.notable_quotes || []).map((quote: string) => ({
         session_id,
         insight_type: 'notable_quote',
-        content: quote
+        content: quote,
+        last_processed_word_count: currentWordCount,
+        transcript_version: newVersion,
+        session_status: session_status || 'in_progress'
       }))
     ];
 
@@ -273,7 +388,11 @@ ${sanitizedTranscript}`
 
     return new Response(
       JSON.stringify({ 
-        success: true, 
+        success: true,
+        is_incremental: !isFirstGeneration,
+        version: newVersion,
+        words_processed: currentWordCount,
+        new_words: newWordCount,
         insights: {
           summary: insights.summary,
           key_points: insights.key_points,

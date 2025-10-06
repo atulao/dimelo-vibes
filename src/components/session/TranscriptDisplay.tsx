@@ -70,10 +70,11 @@ export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
     
     setWordCount(totalWords);
 
-    // Auto-generate insights at thresholds
-    if (totalWords >= 500 && lastGeneratedAt === 0) {
+    // Auto-generate insights at thresholds (incremental)
+    // First generation at 200 words, then every 300 new words
+    if (totalWords >= 200 && lastGeneratedAt === 0) {
       generateInsights(totalWords);
-    } else if (totalWords >= lastGeneratedAt + 1000 && lastGeneratedAt > 0) {
+    } else if (totalWords >= lastGeneratedAt + 300 && lastGeneratedAt > 0) {
       generateInsights(totalWords);
     }
   }, [segments]);
@@ -85,12 +86,13 @@ export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
     try {
       const transcriptText = segments.map(s => s.text).join(" ");
 
-      console.log(`Generating insights for ${currentWordCount} words...`);
+      console.log(`Generating incremental insights for ${currentWordCount} words...`);
 
       const { data, error } = await supabase.functions.invoke('generate-insights', {
         body: { 
           session_id: sessionId, 
-          transcript_text: transcriptText 
+          transcript_text: transcriptText,
+          session_status: 'live' // Can be updated based on actual session status
         }
       });
 
@@ -99,13 +101,22 @@ export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
         throw error;
       }
 
-      console.log('Insights generated successfully:', data);
-      setLastGeneratedAt(currentWordCount);
-
-      toast({
-        title: "Insights Updated",
-        description: "AI insights have been generated from the transcript.",
-      });
+      console.log('Insights generated:', data);
+      
+      // Only update lastGeneratedAt if insights were actually generated
+      if (data?.success) {
+        setLastGeneratedAt(currentWordCount);
+        
+        const isIncremental = data?.is_incremental;
+        const newWords = data?.new_words || 0;
+        
+        toast({
+          title: isIncremental ? "Insights Updated" : "Insights Generated",
+          description: isIncremental 
+            ? `AI insights updated with ${newWords} new words.`
+            : "AI insights have been generated from the transcript.",
+        });
+      }
     } catch (error: any) {
       console.error("Error generating insights:", error);
       // Don't show error toast for auto-generation failures

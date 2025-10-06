@@ -20,24 +20,36 @@ export type Database = {
           created_at: string
           id: string
           insight_type: string
+          last_processed_word_count: number | null
           search_vector: unknown | null
           session_id: string
+          session_status: string | null
+          transcript_version: number | null
+          updated_at: string | null
         }
         Insert: {
           content: string
           created_at?: string
           id?: string
           insight_type: string
+          last_processed_word_count?: number | null
           search_vector?: unknown | null
           session_id: string
+          session_status?: string | null
+          transcript_version?: number | null
+          updated_at?: string | null
         }
         Update: {
           content?: string
           created_at?: string
           id?: string
           insight_type?: string
+          last_processed_word_count?: number | null
           search_vector?: unknown | null
           session_id?: string
+          session_status?: string | null
+          transcript_version?: number | null
+          updated_at?: string | null
         }
         Relationships: [
           {

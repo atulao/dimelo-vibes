@@ -22,23 +22,49 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false }: AIInsights
   useEffect(() => {
     fetchInsights();
     
-    const interval = setInterval(fetchInsights, 10000);
-    return () => clearInterval(interval);
+    // Subscribe to realtime updates for insights
+    const channel = supabase
+      .channel('insights-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ai_insights',
+          filter: `session_id=eq.${sessionId}`
+        },
+        () => {
+          console.log('Insights updated, refreshing...');
+          fetchInsights();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [sessionId]);
 
   const fetchInsights = async () => {
     try {
+      // Fetch only the latest version of insights
       const { data, error } = await supabase
         .from("ai_insights")
         .select("*")
         .eq("session_id", sessionId)
-        .order("created_at", { ascending: false });
+        .order("transcript_version", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(50); // Limit to latest insights
 
       if (error) throw error;
       
       if (data && data.length > 0) {
-        setInsights(data);
-        setLastUpdated(new Date(data[0].created_at));
+        // Filter to only show the latest version
+        const latestVersion = data[0].transcript_version;
+        const latestInsights = data.filter(i => i.transcript_version === latestVersion);
+        
+        setInsights(latestInsights);
+        setLastUpdated(new Date(data[0].updated_at || data[0].created_at));
       }
     } catch (error) {
       console.error("Error fetching insights:", error);
