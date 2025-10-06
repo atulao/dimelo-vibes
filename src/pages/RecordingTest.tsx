@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2 } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface TranscriptSegment {
   id: string;
@@ -17,13 +20,136 @@ export default function RecordingTest() {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState([80]);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string>("");
+  const [hasAudioInput, setHasAudioInput] = useState(true);
+  const [isPeaking, setIsPeaking] = useState(false);
+  const [sampleRate, setSampleRate] = useState<number>(0);
+  const [isBrowserSupported, setIsBrowserSupported] = useState(true);
+  
   const { toast } = useToast();
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number>();
+  const timerIntervalRef = useRef<NodeJS.Timeout>();
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Check browser support
+  useEffect(() => {
+    const checkSupport = () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setIsBrowserSupported(false);
+        return;
+      }
+      if (typeof MediaRecorder === 'undefined') {
+        setIsBrowserSupported(false);
+        return;
+      }
+    };
+    checkSupport();
+  }, []);
+
+  // Get available audio devices
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        const deviceList = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = deviceList.filter(device => device.kind === 'audioinput');
+        setDevices(audioInputs);
+        if (audioInputs.length > 0 && !selectedDevice) {
+          setSelectedDevice(audioInputs[0].deviceId);
+        }
+      } catch (error) {
+        console.error('Error getting devices:', error);
+      }
+    };
+    getDevices();
+  }, [selectedDevice]);
+
+  // Recording timer
+  useEffect(() => {
+    if (isRecording) {
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      setRecordingTime(0);
+    }
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [isRecording]);
+
+  // Audio playback controls
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume[0] / 100;
+    }
+  }, [volume]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const setupAudioAnalyser = (stream: MediaStream) => {
+    audioContextRef.current = new AudioContext();
+    const source = audioContextRef.current.createMediaStreamSource(stream);
+    analyserRef.current = audioContextRef.current.createAnalyser();
+    analyserRef.current.fftSize = 256;
+    source.connect(analyserRef.current);
+
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    
+    const updateLevel = () => {
+      if (!analyserRef.current || !isRecording) return;
+      
+      analyserRef.current.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      const normalized = Math.min(100, (average / 255) * 100);
+      
+      setAudioLevel(normalized);
+      setHasAudioInput(normalized > 1);
+      setIsPeaking(normalized > 90);
+      
+      animationFrameRef.current = requestAnimationFrame(updateLevel);
+    };
+    
+    updateLevel();
+  };
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      const constraints = {
+        audio: selectedDevice 
+          ? { deviceId: { exact: selectedDevice } }
+          : true
+      };
       
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+      
+      // Get sample rate
+      const track = stream.getAudioTracks()[0];
+      const settings = track.getSettings();
+      setSampleRate(settings.sampleRate || 0);
+      
+      // Setup audio analysis
+      setupAudioAnalyser(stream);
+      
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       const chunks: Blob[] = [];
       
       recorder.ondataavailable = (e) => {
@@ -34,10 +160,19 @@ export default function RecordingTest() {
 
       recorder.onstop = async () => {
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        setRecordedAudioBlob(audioBlob);
         await processAudio(audioBlob);
         
         // Cleanup
-        stream.getTracks().forEach(track => track.stop());
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        if (audioContextRef.current) {
+          audioContextRef.current.close();
+        }
       };
 
       recorder.start();
@@ -50,11 +185,25 @@ export default function RecordingTest() {
         description: "Speak into your microphone...",
       });
     } catch (error: any) {
-      toast({
-        title: "Recording Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error.name === 'NotAllowedError') {
+        toast({
+          title: "Permission Denied",
+          description: "Please allow microphone access to record audio.",
+          variant: "destructive",
+        });
+      } else if (error.name === 'NotFoundError') {
+        toast({
+          title: "No Microphone Found",
+          description: "Please connect a microphone and try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Recording Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -63,6 +212,36 @@ export default function RecordingTest() {
       mediaRecorder.stop();
       setIsRecording(false);
       setIsProcessing(true);
+      setAudioLevel(0);
+    }
+  };
+
+  const playAudio = () => {
+    if (audioRef.current && recordedAudioBlob) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.src = URL.createObjectURL(recordedAudioBlob);
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
+    }
+  };
+
+  const downloadAudio = () => {
+    if (recordedAudioBlob) {
+      const url = URL.createObjectURL(recordedAudioBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recording-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download Started",
+        description: "Your recording is being downloaded.",
+      });
     }
   };
 
@@ -134,6 +313,12 @@ export default function RecordingTest() {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
+      <audio 
+        ref={audioRef} 
+        onEnded={() => setIsPlaying(false)}
+        className="hidden"
+      />
+      
       <div className="max-w-4xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Recording Test</h1>
@@ -142,20 +327,90 @@ export default function RecordingTest() {
           </p>
         </div>
 
+        {!isBrowserSupported && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Your browser doesn't support audio recording. Please use Chrome, Edge, or Firefox.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mic className="h-5 w-5" />
-              Audio Recorder
+              Audio Settings
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Microphone</label>
+              <Select value={selectedDevice} onValueChange={setSelectedDevice}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select microphone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device) => (
+                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {sampleRate > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Sample Rate:</span>
+                <Badge variant="secondary">{sampleRate} Hz</Badge>
+              </div>
+            )}
+
+            {isRecording && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Audio Level:</span>
+                  {isPeaking && (
+                    <Badge variant="destructive" className="animate-pulse">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Peaking!
+                    </Badge>
+                  )}
+                  {!hasAudioInput && (
+                    <Badge variant="secondary">
+                      No audio detected
+                    </Badge>
+                  )}
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-100 ${
+                      isPeaking ? 'bg-destructive' : 'bg-primary'
+                    }`}
+                    style={{ width: `${audioLevel}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mic className="h-5 w-5" />
+              Recording Controls
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4 flex-wrap">
               {!isRecording && !isProcessing && (
                 <Button
                   onClick={startRecording}
                   size="lg"
                   className="flex items-center gap-2"
+                  disabled={!isBrowserSupported}
                 >
                   <Mic className="h-5 w-5" />
                   Start Recording
@@ -163,15 +418,21 @@ export default function RecordingTest() {
               )}
 
               {isRecording && (
-                <Button
-                  onClick={stopRecording}
-                  size="lg"
-                  variant="destructive"
-                  className="flex items-center gap-2"
-                >
-                  <Square className="h-5 w-5" />
-                  Stop Recording
-                </Button>
+                <>
+                  <Button
+                    onClick={stopRecording}
+                    size="lg"
+                    variant="destructive"
+                    className="flex items-center gap-2"
+                  >
+                    <Square className="h-5 w-5" />
+                    Stop Recording
+                  </Button>
+                  <Badge variant="destructive" className="animate-pulse">
+                    <div className="w-2 h-2 rounded-full bg-white mr-2" />
+                    {formatTime(recordingTime)}
+                  </Badge>
+                </>
               )}
 
               {isProcessing && (
@@ -180,23 +441,74 @@ export default function RecordingTest() {
                   Processing...
                 </Button>
               )}
-
-              {isRecording && (
-                <Badge variant="destructive" className="animate-pulse">
-                  Recording...
-                </Badge>
-              )}
             </div>
 
             <p className="text-sm text-muted-foreground">
               {isRecording
-                ? "Recording in progress. Click Stop when you're done."
+                ? "Recording in progress. You can record for 5+ minutes."
                 : isProcessing
                 ? "Processing your audio..."
                 : "Click Start Recording to begin testing transcription"}
             </p>
           </CardContent>
         </Card>
+
+        {recordedAudioBlob && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Volume2 className="h-5 w-5" />
+                Playback Controls
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <Button
+                  onClick={playAudio}
+                  size="lg"
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  {isPlaying ? (
+                    <>
+                      <Pause className="h-5 w-5" />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-5 w-5" />
+                      Play Recording
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={downloadAudio}
+                  size="lg"
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-5 w-5" />
+                  Download
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Volume:</span>
+                  <span className="font-medium">{volume[0]}%</span>
+                </div>
+                <Slider
+                  value={volume}
+                  onValueChange={setVolume}
+                  max={100}
+                  step={1}
+                  className="w-full"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
