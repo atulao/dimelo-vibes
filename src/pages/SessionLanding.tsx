@@ -5,7 +5,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, User, ArrowRight } from "lucide-react";
+import { Calendar, Clock, MapPin, User, ArrowRight, Mic } from "lucide-react";
+import { SessionControlPanel } from "@/components/session/SessionControlPanel";
+import { AIInsightsPanel } from "@/components/session/AIInsightsPanel";
+import { useUserRole } from "@/hooks/useUserRole";
 import { format, isBefore, isAfter } from "date-fns";
 
 const SessionLanding = () => {
@@ -14,7 +17,10 @@ const SessionLanding = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [isSpeaker, setIsSpeaker] = useState(false);
+  const [canManageSession, setCanManageSession] = useState(false);
   const { toast } = useToast();
+  const { role } = useUserRole();
 
   useEffect(() => {
     checkAuth();
@@ -46,7 +52,8 @@ const SessionLanding = () => {
             name,
             conferences (
               name,
-              location
+              location,
+              organization_id
             )
           )
         `)
@@ -54,6 +61,15 @@ const SessionLanding = () => {
         .single();
 
       if (error) throw error;
+      
+      // Check if current user is the speaker
+      const isSpeakerUser = data.speaker_email === user?.email;
+      setIsSpeaker(isSpeakerUser);
+      
+      // Check if user can manage session (speaker, organizer, or admin)
+      const canManage = isSpeakerUser || role === 'admin' || role === 'organizer';
+      setCanManageSession(canManage);
+      
       setSession(data);
     } catch (error: any) {
       toast({
@@ -212,6 +228,45 @@ const SessionLanding = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Recording Controls and AI Insights - Visible to Speaker/Organizer */}
+        {canManageSession && (
+          <div className="grid gap-8 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mic className="h-5 w-5" />
+                  Recording Controls
+                </CardTitle>
+                <CardDescription>
+                  Record the session and generate AI insights
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SessionControlPanel 
+                  sessionId={id!} 
+                  sessionStatus={session.status}
+                  onStatusChange={fetchSession}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>AI Insights</CardTitle>
+                <CardDescription>
+                  Real-time summaries generated during recording
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AIInsightsPanel 
+                  sessionId={id!} 
+                  canRegenerate={isSpeaker}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
