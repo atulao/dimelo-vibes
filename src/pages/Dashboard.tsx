@@ -28,8 +28,12 @@ const Dashboard = () => {
       return;
     }
 
-    if (role) {
+    if (role && !roleLoading) {
+      console.log("Fetching dashboard data for role:", role);
       fetchDashboardData();
+    } else if (!roleLoading && role === null) {
+      console.log("Role is null after loading");
+      setLoading(false);
     }
   }, [role, roleLoading, user]);
 
@@ -144,6 +148,29 @@ const Dashboard = () => {
             <Skeleton className="h-32" />
             <Skeleton className="h-32" />
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If no role is assigned (shouldn't happen, but handle it)
+  if (!role) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Welcome to ConferenceAI</h3>
+              <p className="text-muted-foreground mb-4">
+                Your account is being set up. Please refresh the page or browse conferences.
+              </p>
+              <Button onClick={() => navigate("/browse")}>
+                Browse Conferences
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
