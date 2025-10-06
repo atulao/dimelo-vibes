@@ -24,6 +24,10 @@ import { UpdateConferenceDialog } from "@/components/conferences/UpdateConferenc
 import { CreateTrackDialog } from "@/components/tracks/CreateTrackDialog";
 import { TrackCard } from "@/components/tracks/TrackCard";
 import { EditTrackDialog } from "@/components/tracks/EditTrackDialog";
+import { CreateSessionDialog } from "@/components/sessions/CreateSessionDialog";
+import { EditSessionDialog } from "@/components/sessions/EditSessionDialog";
+import { SessionSchedule } from "@/components/sessions/SessionSchedule";
+import { QRCodeDialog } from "@/components/sessions/QRCodeDialog";
 
 const ConferenceDetail = () => {
   const { id } = useParams();
@@ -31,16 +35,21 @@ const ConferenceDetail = () => {
   const { user, loading: authLoading } = useAuth();
   const [conference, setConference] = useState<any>(null);
   const [tracks, setTracks] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editConferenceOpen, setEditConferenceOpen] = useState(false);
   const [editTrack, setEditTrack] = useState<any>(null);
   const [deleteTrackId, setDeleteTrackId] = useState<string | null>(null);
+  const [editSession, setEditSession] = useState<any>(null);
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
+  const [qrSession, setQrSession] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if (user && id) {
       fetchConference();
       fetchTracks();
+      fetchSessions();
     }
   }, [user, id]);
 
@@ -92,6 +101,25 @@ const ConferenceDetail = () => {
     }
   };
 
+  const fetchSessions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("*, tracks(conference_id)")
+        .eq("tracks.conference_id", id)
+        .order("start_time", { ascending: true });
+
+      if (error) throw error;
+      setSessions(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteTrack = async () => {
     if (!deleteTrackId) return;
 
@@ -117,6 +145,34 @@ const ConferenceDetail = () => {
       });
     } finally {
       setDeleteTrackId(null);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!deleteSessionId) return;
+
+    try {
+      const { error } = await supabase
+        .from("sessions")
+        .delete()
+        .eq("id", deleteSessionId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Session deleted successfully",
+      });
+
+      fetchSessions();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteSessionId(null);
     }
   };
 
@@ -276,17 +332,21 @@ const ConferenceDetail = () => {
           </TabsContent>
 
           <TabsContent value="sessions" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sessions</CardTitle>
-                <CardDescription>Coming soon</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Session management will be available here
-                </p>
-              </CardContent>
-            </Card>
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-2xl font-bold">Conference Sessions</h3>
+                <p className="text-muted-foreground">Manage your conference schedule</p>
+              </div>
+              <CreateSessionDialog conferenceId={id!} onSuccess={fetchSessions} />
+            </div>
+
+            <SessionSchedule
+              sessions={sessions}
+              tracks={tracks}
+              onEdit={setEditSession}
+              onDelete={setDeleteSessionId}
+              onGenerateQR={setQrSession}
+            />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6 mt-6">
@@ -318,6 +378,20 @@ const ConferenceDetail = () => {
           onSuccess={fetchTracks}
         />
 
+        <EditSessionDialog
+          session={editSession}
+          conferenceId={id!}
+          open={!!editSession}
+          onOpenChange={(open) => !open && setEditSession(null)}
+          onSuccess={fetchSessions}
+        />
+
+        <QRCodeDialog
+          session={qrSession}
+          open={!!qrSession}
+          onOpenChange={(open) => !open && setQrSession(null)}
+        />
+
         <AlertDialog open={!!deleteTrackId} onOpenChange={() => setDeleteTrackId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -330,6 +404,21 @@ const ConferenceDetail = () => {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleDeleteTrack}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!deleteSessionId} onOpenChange={() => setDeleteSessionId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this session. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteSession}>Delete</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
