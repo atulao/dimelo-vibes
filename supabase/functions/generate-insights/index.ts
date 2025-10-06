@@ -163,7 +163,7 @@ serve(async (req) => {
       summary: latestInsights.find(i => i.insight_type === 'summary')?.content || '',
       key_points: latestInsights.filter(i => i.insight_type === 'key_point').map(i => i.content),
       action_items: latestInsights.filter(i => i.insight_type === 'action_item').map(i => i.content),
-      notable_quotes: latestInsights.filter(i => i.insight_type === 'notable_quote').map(i => i.content)
+      notable_quotes: latestInsights.filter(i => i.insight_type === 'quote').map(i => i.content)
     } : null;
 
     // Structured logging (no sensitive content)
@@ -362,7 +362,7 @@ Keep the best insights from before and add new ones from this segment.`;
       })),
       ...(insights.notable_quotes || []).map((quote: string) => ({
         session_id,
-        insight_type: 'notable_quote',
+        insight_type: 'quote',
         content: quote,
         last_processed_word_count: currentWordCount,
         transcript_version: newVersion,

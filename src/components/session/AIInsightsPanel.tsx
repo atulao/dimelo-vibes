@@ -16,6 +16,7 @@ interface AIInsightsPanelProps {
 export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatus }: AIInsightsPanelProps) => {
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [insights, setInsights] = useState<any[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { toast } = useToast();
@@ -46,7 +47,7 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
     if (sessionStatus === 'live') {
       refreshInterval = setInterval(() => {
         console.log('Auto-refreshing insights (2min interval)...');
-        fetchInsights();
+        fetchInsights(true); // Show updating state
       }, 2 * 60 * 1000); // 2 minutes
     }
     
@@ -56,7 +57,8 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
     };
   }, [sessionId, sessionStatus]);
 
-  const fetchInsights = async () => {
+  const fetchInsights = async (showUpdating = false) => {
+    if (showUpdating) setUpdating(true);
     try {
       // Fetch only the latest version of insights
       const { data, error } = await supabase
@@ -81,6 +83,7 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
       console.error("Error fetching insights:", error);
     } finally {
       setLoading(false);
+      setUpdating(false);
     }
   };
 
@@ -197,6 +200,14 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
               <Skeleton className="h-4 w-3/4" />
             </div>
           </>
+        ) : updating ? (
+          <div className="text-center py-8">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-sm font-medium mb-2">Updating insights...</p>
+            <p className="text-xs text-muted-foreground">
+              Processing new transcript content
+            </p>
+          </div>
         ) : insights.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground mb-4">
