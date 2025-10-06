@@ -4,11 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import { TranscriptDisplay } from "@/components/session/TranscriptDisplay";
 import { AIInsightsPanel } from "@/components/session/AIInsightsPanel";
 import { QASection } from "@/components/session/QASection";
 import { SessionControlPanel } from "@/components/session/SessionControlPanel";
+import { AttendeeList } from "@/components/session/AttendeeList";
+import { useAttendeeTracking } from "@/hooks/useAttendeeTracking";
+import { useUserRole } from "@/hooks/useUserRole";
 
 const SessionLive = () => {
   const { id } = useParams();
@@ -16,7 +19,10 @@ const SessionLive = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSpeaker, setIsSpeaker] = useState(false);
+  const [canViewAttendees, setCanViewAttendees] = useState(false);
   const { toast } = useToast();
+  const { user, role } = useUserRole();
+  const { hasJoined, joinSession } = useAttendeeTracking(id!, user?.id);
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -45,9 +51,19 @@ const SessionLive = () => {
       if (error) throw error;
       
       // Check if current user is the speaker
-      setIsSpeaker(data.speaker_email === user.email);
+      const isSpeakerUser = data.speaker_email === user.email;
+      setIsSpeaker(isSpeakerUser);
+      
+      // Check if user can view attendees (speaker or organizer/admin)
+      const canView = isSpeakerUser || role === 'admin' || role === 'organizer';
+      setCanViewAttendees(canView);
       
       setSession(data);
+      
+      // Auto-join session for non-speakers
+      if (!isSpeakerUser && !hasJoined) {
+        joinSession();
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -108,7 +124,7 @@ const SessionLive = () => {
             <TranscriptDisplay sessionId={id!} />
           </div>
 
-          {/* Right: Controls + AI Insights + Q&A (1 column) */}
+          {/* Right: Controls + Attendees + AI Insights + Q&A (1 column) */}
           <div className="space-y-6 overflow-y-auto">
             {isSpeaker && (
               <SessionControlPanel 
@@ -117,6 +133,7 @@ const SessionLive = () => {
                 onStatusChange={checkAuthAndFetch}
               />
             )}
+            <AttendeeList sessionId={id!} canViewList={canViewAttendees} />
             <AIInsightsPanel sessionId={id!} canRegenerate={isSpeaker} />
             <QASection sessionId={id!} />
           </div>
@@ -132,6 +149,9 @@ const SessionLive = () => {
               onStatusChange={checkAuthAndFetch}
             />
           )}
+
+          {/* Attendees */}
+          <AttendeeList sessionId={id!} canViewList={canViewAttendees} />
 
           {/* Transcript */}
           <div className="h-[50vh]">

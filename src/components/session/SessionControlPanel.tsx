@@ -77,10 +77,15 @@ export const SessionControlPanel = ({
         .select("*", { count: "exact", head: true })
         .eq("session_id", sessionId);
 
-      // For now, we don't have a way to track unique attendees
-      // This would require a separate tracking mechanism
+      // Count active attendees (joined but not left)
+      const { count: attendeeCount } = await supabase
+        .from("session_attendees")
+        .select("*", { count: "exact", head: true })
+        .eq("session_id", sessionId)
+        .is("left_at", null);
+
       setAnalytics({
-        attendeeCount: 0, // TODO: Implement attendee tracking
+        attendeeCount: attendeeCount || 0,
         questionCount: questionCount || 0,
         transcriptSegments: transcriptCount || 0,
       });

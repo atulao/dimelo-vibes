@@ -13,6 +13,7 @@ import ConferenceDetail from "./pages/ConferenceDetail";
 import SessionLanding from "./pages/SessionLanding";
 import SessionLive from "./pages/SessionLive";
 import SpeakerSessions from "./pages/SpeakerSessions";
+import SessionAnalyticsPage from "./pages/SessionAnalyticsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/conferences/:id" element={<ConferenceDetail />} />
           <Route path="/session/:id" element={<SessionLanding />} />
           <Route path="/session/:id/live" element={<SessionLive />} />
+          <Route path="/session/:id/analytics" element={<SessionAnalyticsPage />} />
           <Route path="/speaker/sessions" element={<SpeakerSessions />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
