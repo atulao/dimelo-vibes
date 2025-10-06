@@ -208,11 +208,19 @@ export const SessionControlPanel = ({
             )}
           </div>
 
-          {/* Audio Recording Controls */}
-          <AudioRecorder 
-            sessionId={sessionId}
-            isSessionLive={status === "live"}
-          />
+          {/* Audio Recording Controls - Available at any time */}
+          <div className="pt-4 border-t">
+            <h4 className="text-sm font-semibold mb-3">Recording</h4>
+            <AudioRecorder 
+              sessionId={sessionId}
+              isSessionLive={status === "live"}
+            />
+            {status !== "live" && (
+              <p className="text-xs text-muted-foreground mt-2">
+                You can record at any time, even when the session isn't live.
+              </p>
+            )}
+          </div>
 
           {/* Live Analytics */}
           {status === "live" && (

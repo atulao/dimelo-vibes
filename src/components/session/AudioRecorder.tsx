@@ -279,9 +279,7 @@ export const AudioRecorder = ({ sessionId, isSessionLive }: AudioRecorderProps) 
     });
   };
 
-  if (!isSessionLive) {
-    return null;
-  }
+  // Recording is now available at any time, not just during live sessions
 
   return (
     <div className="space-y-4">

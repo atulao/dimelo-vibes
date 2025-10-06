@@ -8,7 +8,9 @@ export const useAttendeeTracking = (sessionId: string, userId: string | undefine
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!userId) return;
+    // Validate session ID is a proper UUID, not a route parameter
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!userId || !sessionId || !uuidRegex.test(sessionId)) return;
 
     // Check if user has already joined
     checkExistingAttendance();
