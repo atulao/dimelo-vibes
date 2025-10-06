@@ -28,18 +28,13 @@ const Dashboard = () => {
       return;
     }
 
-    if (role && !roleLoading) {
-      console.log("Fetching dashboard data for role:", role);
+    if (role) {
       fetchDashboardData();
-    } else if (!roleLoading && role === null) {
-      console.log("Role is null after loading");
-      setLoading(false);
     }
   }, [role, roleLoading, user]);
 
   const fetchDashboardData = async () => {
     try {
-      console.log("Starting fetchDashboardData for role:", role);
       switch (role) {
         case "admin":
           await fetchAdminStats();
@@ -53,14 +48,9 @@ const Dashboard = () => {
         case "attendee":
           await fetchAttendeeData();
           break;
-        default:
-          console.log("Unknown role:", role);
       }
-      console.log("Dashboard data fetched successfully");
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
-      // Set loading to false even on error so page can render
-      setStats({ error: true });
     } finally {
       setLoading(false);
     }
@@ -154,29 +144,6 @@ const Dashboard = () => {
             <Skeleton className="h-32" />
             <Skeleton className="h-32" />
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // If no role is assigned (shouldn't happen, but handle it)
-  if (!role) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Welcome to ConferenceAI</h3>
-              <p className="text-muted-foreground mb-4">
-                Your account is being set up. Please refresh the page or browse conferences.
-              </p>
-              <Button onClick={() => navigate("/browse")}>
-                Browse Conferences
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     );
@@ -417,30 +384,14 @@ const Dashboard = () => {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back, {user?.user_metadata?.full_name || user?.email || "User"}
+            Welcome back, {user?.user_metadata?.full_name || user?.email}
           </p>
         </div>
 
-        {stats?.error ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <h3 className="text-lg font-semibold mb-2">Error Loading Dashboard</h3>
-              <p className="text-muted-foreground mb-4">
-                There was an error loading your dashboard data. Please try refreshing the page.
-              </p>
-              <Button onClick={() => window.location.reload()}>
-                Refresh Page
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            {role === "admin" && renderAdminDashboard()}
-            {role === "organizer" && renderOrganizerDashboard()}
-            {role === "speaker" && renderSpeakerDashboard()}
-            {role === "attendee" && renderAttendeeDashboard()}
-          </>
-        )}
+        {role === "admin" && renderAdminDashboard()}
+        {role === "organizer" && renderOrganizerDashboard()}
+        {role === "speaker" && renderSpeakerDashboard()}
+        {role === "attendee" && renderAttendeeDashboard()}
       </div>
     </div>
   );

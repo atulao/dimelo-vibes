@@ -24,7 +24,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { NotificationBell } from "./NotificationBell";
-import { GlobalSearch } from "./GlobalSearch";
 
 export const Navigation = () => {
   const { role, user, loading } = useUserRole();
@@ -132,7 +131,6 @@ export const Navigation = () => {
           <div className="flex items-center gap-2">
             {!user ? (
               <>
-                {/* <GlobalSearch /> */}
                 <Button variant="ghost" size="sm" asChild>
                   <Link to="/browse">Browse Conferences</Link>
                 </Button>
@@ -142,7 +140,6 @@ export const Navigation = () => {
               </>
             ) : (
               <>
-                {/* <GlobalSearch /> */}
                 <NotificationBell userId={user?.id} />
                 <DropdownMenu>
                 <DropdownMenuTrigger asChild>
