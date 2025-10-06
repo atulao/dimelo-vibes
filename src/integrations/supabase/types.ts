@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           id: string
           insight_type: string
+          search_vector: unknown | null
           session_id: string
         }
         Insert: {
@@ -27,6 +28,7 @@ export type Database = {
           created_at?: string
           id?: string
           insight_type: string
+          search_vector?: unknown | null
           session_id: string
         }
         Update: {
@@ -34,6 +36,7 @@ export type Database = {
           created_at?: string
           id?: string
           insight_type?: string
+          search_vector?: unknown | null
           session_id?: string
         }
         Relationships: [
@@ -56,6 +59,7 @@ export type Database = {
           location: string | null
           name: string
           organization_id: string
+          search_vector: unknown | null
           start_date: string | null
           updated_at: string
         }
@@ -68,6 +72,7 @@ export type Database = {
           location?: string | null
           name: string
           organization_id: string
+          search_vector?: unknown | null
           start_date?: string | null
           updated_at?: string
         }
@@ -80,6 +85,7 @@ export type Database = {
           location?: string | null
           name?: string
           organization_id?: string
+          search_vector?: unknown | null
           start_date?: string | null
           updated_at?: string
         }
@@ -239,6 +245,39 @@ export type Database = {
           },
         ]
       }
+      saved_searches: {
+        Row: {
+          created_at: string
+          email_alerts: boolean | null
+          filters: Json | null
+          id: string
+          name: string
+          query: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_alerts?: boolean | null
+          filters?: Json | null
+          id?: string
+          name: string
+          query: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_alerts?: boolean | null
+          filters?: Json | null
+          id?: string
+          name?: string
+          query?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       session_attendees: {
         Row: {
           created_at: string
@@ -284,6 +323,7 @@ export type Database = {
           is_recording: boolean | null
           qr_code_url: string | null
           recording_url: string | null
+          search_vector: unknown | null
           speaker_bio: string | null
           speaker_email: string | null
           speaker_name: string | null
@@ -302,6 +342,7 @@ export type Database = {
           is_recording?: boolean | null
           qr_code_url?: string | null
           recording_url?: string | null
+          search_vector?: unknown | null
           speaker_bio?: string | null
           speaker_email?: string | null
           speaker_name?: string | null
@@ -320,6 +361,7 @@ export type Database = {
           is_recording?: boolean | null
           qr_code_url?: string | null
           recording_url?: string | null
+          search_vector?: unknown | null
           speaker_bio?: string | null
           speaker_email?: string | null
           speaker_name?: string | null
@@ -380,6 +422,7 @@ export type Database = {
           created_at: string
           end_time: number | null
           id: string
+          search_vector: unknown | null
           session_id: string
           speaker_label: string | null
           start_time: number | null
@@ -390,6 +433,7 @@ export type Database = {
           created_at?: string
           end_time?: number | null
           id?: string
+          search_vector?: unknown | null
           session_id: string
           speaker_label?: string | null
           start_time?: number | null
@@ -400,6 +444,7 @@ export type Database = {
           created_at?: string
           end_time?: number | null
           id?: string
+          search_vector?: unknown | null
           session_id?: string
           speaker_label?: string | null
           start_time?: number | null
