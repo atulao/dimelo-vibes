@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Browse from "./pages/Browse";
+import Search from "./pages/Search";
 import Organizations from "./pages/Organizations";
 import Conferences from "./pages/Conferences";
 import ConferenceDetail from "./pages/ConferenceDetail";
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/browse" element={<Browse />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/organizations" element={<Organizations />} />
           <Route path="/conferences" element={<Conferences />} />
           <Route path="/conferences/:id" element={<ConferenceDetail />} />
