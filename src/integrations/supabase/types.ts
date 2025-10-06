@@ -257,6 +257,47 @@ export type Database = {
           },
         ]
       }
+      recording_settings: {
+        Row: {
+          audio_quality: string | null
+          auto_speaker_detection: boolean | null
+          created_at: string | null
+          id: string
+          selected_device_id: string | null
+          session_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          audio_quality?: string | null
+          auto_speaker_detection?: boolean | null
+          created_at?: string | null
+          id?: string
+          selected_device_id?: string | null
+          session_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          audio_quality?: string | null
+          auto_speaker_detection?: boolean | null
+          created_at?: string | null
+          id?: string
+          selected_device_id?: string | null
+          session_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recording_settings_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_searches: {
         Row: {
           created_at: string
@@ -343,6 +384,8 @@ export type Database = {
           status: Database["public"]["Enums"]["session_status"] | null
           title: string
           track_id: string
+          transcription_provider: string | null
+          transcription_settings: Json | null
           updated_at: string
         }
         Insert: {
@@ -362,6 +405,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["session_status"] | null
           title: string
           track_id: string
+          transcription_provider?: string | null
+          transcription_settings?: Json | null
           updated_at?: string
         }
         Update: {
@@ -381,6 +426,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["session_status"] | null
           title?: string
           track_id?: string
+          transcription_provider?: string | null
+          transcription_settings?: Json | null
           updated_at?: string
         }
         Relationships: [
@@ -436,7 +483,9 @@ export type Database = {
           id: string
           search_vector: unknown | null
           session_id: string
+          speaker_id: string | null
           speaker_label: string | null
+          speaker_name: string | null
           start_time: number | null
           text: string
         }
@@ -447,7 +496,9 @@ export type Database = {
           id?: string
           search_vector?: unknown | null
           session_id: string
+          speaker_id?: string | null
           speaker_label?: string | null
+          speaker_name?: string | null
           start_time?: number | null
           text: string
         }
@@ -458,7 +509,9 @@ export type Database = {
           id?: string
           search_vector?: unknown | null
           session_id?: string
+          speaker_id?: string | null
           speaker_label?: string | null
+          speaker_name?: string | null
           start_time?: number | null
           text?: string
         }
