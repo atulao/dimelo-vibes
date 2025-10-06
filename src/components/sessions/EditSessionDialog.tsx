@@ -36,6 +36,7 @@ const formSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
   description: z.string().max(2000).optional(),
   speaker_name: z.string().max(100).optional(),
+  speaker_email: z.string().email("Invalid email").optional().or(z.literal("")),
   speaker_bio: z.string().max(1000).optional(),
   start_time: z.string().optional(),
   end_time: z.string().optional(),
@@ -76,6 +77,7 @@ export const EditSessionDialog = ({
           title: session.title,
           description: session.description || "",
           speaker_name: session.speaker_name || "",
+          speaker_email: session.speaker_email || "",
           speaker_bio: session.speaker_bio || "",
           start_time: formatDateTimeLocal(session.start_time),
           end_time: formatDateTimeLocal(session.end_time),
@@ -120,6 +122,7 @@ export const EditSessionDialog = ({
           title: values.title,
           description: values.description || null,
           speaker_name: values.speaker_name || null,
+          speaker_email: values.speaker_email || null,
           speaker_bio: values.speaker_bio || null,
           start_time: values.start_time || null,
           end_time: values.end_time || null,
@@ -213,6 +216,19 @@ export const EditSessionDialog = ({
                   <FormLabel>Speaker Name</FormLabel>
                   <FormControl>
                     <Input placeholder="John Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="speaker_email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Speaker Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="speaker@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

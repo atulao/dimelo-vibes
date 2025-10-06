@@ -8,12 +8,14 @@ import { ArrowLeft } from "lucide-react";
 import { TranscriptDisplay } from "@/components/session/TranscriptDisplay";
 import { AIInsightsPanel } from "@/components/session/AIInsightsPanel";
 import { QASection } from "@/components/session/QASection";
+import { SessionControlPanel } from "@/components/session/SessionControlPanel";
 
 const SessionLive = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isSpeaker, setIsSpeaker] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,6 +43,10 @@ const SessionLive = () => {
         .single();
 
       if (error) throw error;
+      
+      // Check if current user is the speaker
+      setIsSpeaker(data.speaker_email === user.email);
+      
       setSession(data);
     } catch (error: any) {
       toast({
@@ -102,8 +108,15 @@ const SessionLive = () => {
             <TranscriptDisplay sessionId={id!} />
           </div>
 
-          {/* Right: AI Insights + Q&A (1 column) */}
+          {/* Right: Controls + AI Insights + Q&A (1 column) */}
           <div className="space-y-6 overflow-y-auto">
+            {isSpeaker && (
+              <SessionControlPanel 
+                sessionId={id!} 
+                sessionStatus={session.status}
+                onStatusChange={checkAuthAndFetch}
+              />
+            )}
             <AIInsightsPanel sessionId={id!} />
             <QASection sessionId={id!} />
           </div>
@@ -111,6 +124,15 @@ const SessionLive = () => {
 
         {/* Mobile/Tablet Layout */}
         <div className="lg:hidden space-y-6">
+          {/* Speaker Controls */}
+          {isSpeaker && (
+            <SessionControlPanel 
+              sessionId={id!} 
+              sessionStatus={session.status}
+              onStatusChange={checkAuthAndFetch}
+            />
+          )}
+
           {/* Transcript */}
           <div className="h-[50vh]">
             <TranscriptDisplay sessionId={id!} />

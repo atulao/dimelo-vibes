@@ -218,6 +218,7 @@ export type Database = {
           is_recording: boolean | null
           qr_code_url: string | null
           speaker_bio: string | null
+          speaker_email: string | null
           speaker_name: string | null
           start_time: string | null
           status: Database["public"]["Enums"]["session_status"] | null
@@ -233,6 +234,7 @@ export type Database = {
           is_recording?: boolean | null
           qr_code_url?: string | null
           speaker_bio?: string | null
+          speaker_email?: string | null
           speaker_name?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["session_status"] | null
@@ -248,6 +250,7 @@ export type Database = {
           is_recording?: boolean | null
           qr_code_url?: string | null
           speaker_bio?: string | null
+          speaker_email?: string | null
           speaker_name?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["session_status"] | null
