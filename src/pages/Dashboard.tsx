@@ -39,6 +39,7 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
+      console.log("Starting fetchDashboardData for role:", role);
       switch (role) {
         case "admin":
           await fetchAdminStats();
@@ -52,9 +53,14 @@ const Dashboard = () => {
         case "attendee":
           await fetchAttendeeData();
           break;
+        default:
+          console.log("Unknown role:", role);
       }
+      console.log("Dashboard data fetched successfully");
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      // Set loading to false even on error so page can render
+      setStats({ error: true });
     } finally {
       setLoading(false);
     }
@@ -411,14 +417,30 @@ const Dashboard = () => {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">
-            Welcome back, {user?.user_metadata?.full_name || user?.email}
+            Welcome back, {user?.user_metadata?.full_name || user?.email || "User"}
           </p>
         </div>
 
-        {role === "admin" && renderAdminDashboard()}
-        {role === "organizer" && renderOrganizerDashboard()}
-        {role === "speaker" && renderSpeakerDashboard()}
-        {role === "attendee" && renderAttendeeDashboard()}
+        {stats?.error ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <h3 className="text-lg font-semibold mb-2">Error Loading Dashboard</h3>
+              <p className="text-muted-foreground mb-4">
+                There was an error loading your dashboard data. Please try refreshing the page.
+              </p>
+              <Button onClick={() => window.location.reload()}>
+                Refresh Page
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {role === "admin" && renderAdminDashboard()}
+            {role === "organizer" && renderOrganizerDashboard()}
+            {role === "speaker" && renderSpeakerDashboard()}
+            {role === "attendee" && renderAttendeeDashboard()}
+          </>
+        )}
       </div>
     </div>
   );
