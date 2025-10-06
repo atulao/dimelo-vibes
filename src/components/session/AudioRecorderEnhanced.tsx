@@ -4,10 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { Mic, MicOff, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface AudioRecorderEnhancedProps {
   sessionId: string;
   isSessionLive: boolean;
+  expectedSpeakers?: string[];
 }
 
 interface SpeechRecognitionEvent extends Event {
@@ -27,7 +35,7 @@ declare global {
   }
 }
 
-export const AudioRecorderEnhanced = ({ sessionId, isSessionLive }: AudioRecorderEnhancedProps) => {
+export const AudioRecorderEnhanced = ({ sessionId, isSessionLive, expectedSpeakers = [] }: AudioRecorderEnhancedProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +43,7 @@ export const AudioRecorderEnhanced = ({ sessionId, isSessionLive }: AudioRecorde
   const [isUploading, setIsUploading] = useState(false);
   const [provider, setProvider] = useState<'browser' | 'whisper'>('browser');
   const [selectedDevice, setSelectedDevice] = useState<string>('');
+  const [currentSpeaker, setCurrentSpeaker] = useState<string>('');
   
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -76,7 +85,7 @@ export const AudioRecorderEnhanced = ({ sessionId, isSessionLive }: AudioRecorde
   const loadSettings = async () => {
     const { data: session } = await supabase
       .from('sessions')
-      .select('transcription_provider, transcription_settings')
+      .select('transcription_provider, transcription_settings, current_speaker')
       .eq('id', sessionId)
       .single();
 
@@ -89,6 +98,12 @@ export const AudioRecorderEnhanced = ({ sessionId, isSessionLive }: AudioRecorde
       const settings = session.transcription_settings as { selectedDevice?: string } | null;
       if (settings?.selectedDevice) {
         setSelectedDevice(settings.selectedDevice);
+      }
+
+      if (session.current_speaker) {
+        setCurrentSpeaker(session.current_speaker);
+      } else if (expectedSpeakers.length > 0) {
+        setCurrentSpeaker(expectedSpeakers[0]);
       }
     }
   };
@@ -152,7 +167,9 @@ export const AudioRecorderEnhanced = ({ sessionId, isSessionLive }: AudioRecorde
         await saveTranscriptSegment(
           data.text,
           1.0, // Whisper doesn't provide confidence
-          Date.now() / 1000
+          Date.now() / 1000,
+          undefined,
+          currentSpeaker || undefined
         );
         
         console.log('Whisper transcription:', data.text);
@@ -303,7 +320,13 @@ export const AudioRecorderEnhanced = ({ sessionId, isSessionLive }: AudioRecorde
           console.log("Transcript:", transcript, "Final:", isFinal, "Confidence:", confidence);
 
           if (isFinal && transcript.trim()) {
-            saveTranscriptSegment(transcript, confidence, timestamp);
+            saveTranscriptSegment(
+              transcript,
+              confidence,
+              timestamp,
+              undefined,
+              currentSpeaker || undefined
+            );
           }
         };
 
@@ -393,8 +416,34 @@ export const AudioRecorderEnhanced = ({ sessionId, isSessionLive }: AudioRecorde
     });
   };
 
+  const handleSpeakerChange = async (speaker: string) => {
+    setCurrentSpeaker(speaker);
+    // Update current speaker in database
+    await supabase
+      .from("sessions")
+      .update({ current_speaker: speaker })
+      .eq("id", sessionId);
+  };
+
   return (
     <div className="space-y-4">
+      {expectedSpeakers.length > 0 && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Current Speaker</label>
+          <Select value={currentSpeaker} onValueChange={handleSpeakerChange}>
+            <SelectTrigger className="w-full bg-background z-50">
+              <SelectValue placeholder="Select speaker" />
+            </SelectTrigger>
+            <SelectContent className="bg-background z-50">
+              {expectedSpeakers.map((speaker) => (
+                <SelectItem key={speaker} value={speaker}>
+                  {speaker}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         {!isRecording ? (
           <Button

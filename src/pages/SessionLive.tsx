@@ -12,6 +12,7 @@ import { SessionControlPanel } from "@/components/session/SessionControlPanel";
 import { AttendeeList } from "@/components/session/AttendeeList";
 import { useAttendeeTracking } from "@/hooks/useAttendeeTracking";
 import { useUserRole } from "@/hooks/useUserRole";
+import { SpeakingTimeBreakdown } from "@/components/session/SpeakingTimeBreakdown";
 
 const SessionLive = () => {
   const { id } = useParams();
@@ -131,9 +132,13 @@ const SessionLive = () => {
                 sessionId={id!} 
                 sessionStatus={session.status}
                 onStatusChange={checkAuthAndFetch}
+                expectedSpeakers={session.expected_speakers || []}
               />
             )}
             <AttendeeList sessionId={id!} canViewList={canViewAttendees} />
+            {session.expected_speakers && session.expected_speakers.length > 0 && (
+              <SpeakingTimeBreakdown sessionId={id!} />
+            )}
             <AIInsightsPanel sessionId={id!} canRegenerate={isSpeaker} sessionStatus={session.status} />
             <QASection sessionId={id!} />
           </div>
@@ -147,11 +152,17 @@ const SessionLive = () => {
               sessionId={id!} 
               sessionStatus={session.status}
               onStatusChange={checkAuthAndFetch}
+              expectedSpeakers={session.expected_speakers || []}
             />
           )}
 
           {/* Attendees */}
           <AttendeeList sessionId={id!} canViewList={canViewAttendees} />
+
+          {/* Speaking Time Breakdown */}
+          {session.expected_speakers && session.expected_speakers.length > 0 && (
+            <SpeakingTimeBreakdown sessionId={id!} />
+          )}
 
           {/* Transcript */}
           <div className="h-[50vh]">

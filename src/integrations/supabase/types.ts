@@ -382,8 +382,10 @@ export type Database = {
       sessions: {
         Row: {
           created_at: string
+          current_speaker: string | null
           description: string | null
           end_time: string | null
+          expected_speakers: string[] | null
           id: string
           is_public: boolean | null
           is_recording: boolean | null
@@ -403,8 +405,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_speaker?: string | null
           description?: string | null
           end_time?: string | null
+          expected_speakers?: string[] | null
           id?: string
           is_public?: boolean | null
           is_recording?: boolean | null
@@ -424,8 +428,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_speaker?: string | null
           description?: string | null
           end_time?: string | null
+          expected_speakers?: string[] | null
           id?: string
           is_public?: boolean | null
           is_recording?: boolean | null

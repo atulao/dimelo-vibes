@@ -28,6 +28,7 @@ interface SessionControlPanelProps {
   sessionId: string;
   sessionStatus: string;
   onStatusChange?: () => void;
+  expectedSpeakers?: string[];
 }
 
 interface Analytics {
@@ -39,7 +40,8 @@ interface Analytics {
 export const SessionControlPanel = ({ 
   sessionId, 
   sessionStatus,
-  onStatusChange 
+  onStatusChange,
+  expectedSpeakers = []
 }: SessionControlPanelProps) => {
   const [status, setStatus] = useState(sessionStatus);
   const [analytics, setAnalytics] = useState<Analytics>({
@@ -214,6 +216,7 @@ export const SessionControlPanel = ({
             <AudioRecorder 
               sessionId={sessionId}
               isSessionLive={status === "live"}
+              expectedSpeakers={expectedSpeakers}
             />
             {status !== "live" && (
               <p className="text-xs text-muted-foreground mt-2">

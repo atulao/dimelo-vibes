@@ -39,6 +39,7 @@ const formSchema = z.object({
   speaker_name: z.string().max(100).optional(),
   speaker_email: z.string().email("Invalid email").optional().or(z.literal("")),
   speaker_bio: z.string().max(1000).optional(),
+  expected_speakers: z.string().optional(),
   start_time: z.string().optional(),
   end_time: z.string().optional(),
 });
@@ -65,6 +66,7 @@ export const CreateSessionDialog = ({ conferenceId, onSuccess }: CreateSessionDi
       speaker_name: "",
       speaker_email: "",
       speaker_bio: "",
+      expected_speakers: "",
       start_time: "",
       end_time: "",
     },
@@ -98,6 +100,11 @@ export const CreateSessionDialog = ({ conferenceId, onSuccess }: CreateSessionDi
   const onSubmit = async (values: FormValues) => {
     setLoading(true);
     try {
+      // Parse expected speakers from comma-separated string
+      const speakersArray = values.expected_speakers
+        ? values.expected_speakers.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
       const { error } = await supabase.from("sessions").insert({
         track_id: values.track_id,
         title: values.title,
@@ -105,6 +112,7 @@ export const CreateSessionDialog = ({ conferenceId, onSuccess }: CreateSessionDi
         speaker_name: values.speaker_name || null,
         speaker_email: values.speaker_email || null,
         speaker_bio: values.speaker_bio || null,
+        expected_speakers: speakersArray,
         start_time: values.start_time || null,
         end_time: values.end_time || null,
         status: "scheduled",
@@ -232,6 +240,22 @@ export const CreateSessionDialog = ({ conferenceId, onSuccess }: CreateSessionDi
                     <Textarea placeholder="About the speaker..." {...field} />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="expected_speakers"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Expected Speakers</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John Doe, Sarah Smith, David Lee (comma-separated)" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                  <p className="text-xs text-muted-foreground">
+                    Used for speaker tracking during recording
+                  </p>
                 </FormItem>
               )}
             />
