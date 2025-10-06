@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { AttendeeList } from "@/components/session/AttendeeList";
 import { useAttendeeTracking } from "@/hooks/useAttendeeTracking";
 import { useUserRole } from "@/hooks/useUserRole";
 import { SpeakingTimeBreakdown } from "@/components/session/SpeakingTimeBreakdown";
+import { CatchUpPanel } from "@/components/session/CatchUpPanel";
 
 const SessionLive = () => {
   const { id } = useParams();
@@ -21,6 +22,8 @@ const SessionLive = () => {
   const [loading, setLoading] = useState(true);
   const [isSpeaker, setIsSpeaker] = useState(false);
   const [canViewAttendees, setCanViewAttendees] = useState(false);
+  const [showCatchUp, setShowCatchUp] = useState(false);
+  const transcriptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { user, role } = useUserRole();
   const { hasJoined, joinSession } = useAttendeeTracking(id!, user?.id);
@@ -65,6 +68,22 @@ const SessionLive = () => {
       if (!isSpeakerUser && !hasJoined) {
         joinSession();
       }
+
+      // Check if user should see catch-up panel
+      // Show if session is live, user is not speaker, and hasn't dismissed it for this session
+      const catchUpDismissed = localStorage.getItem(`catchup-dismissed-${id}`);
+      if (data.status === 'live' && !isSpeakerUser && !catchUpDismissed) {
+        // Check if session started more than 2 minutes ago
+        if (data.start_time) {
+          const sessionStart = new Date(data.start_time);
+          const now = new Date();
+          const minutesAgo = (now.getTime() - sessionStart.getTime()) / (1000 * 60);
+          
+          if (minutesAgo >= 2) {
+            setShowCatchUp(true);
+          }
+        }
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -89,8 +108,29 @@ const SessionLive = () => {
     return null;
   }
 
+  const handleDismissCatchUp = () => {
+    localStorage.setItem(`catchup-dismissed-${id}`, 'true');
+    setShowCatchUp(false);
+  };
+
+  const handleViewTranscript = () => {
+    handleDismissCatchUp();
+    // Scroll to transcript section
+    transcriptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Catch Up Panel */}
+      {showCatchUp && (
+        <CatchUpPanel
+          sessionId={id!}
+          sessionStartTime={session.start_time}
+          onDismiss={handleDismissCatchUp}
+          onViewTranscript={handleViewTranscript}
+        />
+      )}
+
       {/* Header */}
       <div className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -121,7 +161,7 @@ const SessionLive = () => {
         {/* Desktop Layout */}
         <div className="hidden lg:grid lg:grid-cols-3 lg:gap-6 h-[calc(100vh-12rem)]">
           {/* Left: Transcript (2 columns) */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2" ref={transcriptRef}>
             <TranscriptDisplay sessionId={id!} />
           </div>
 
@@ -165,7 +205,7 @@ const SessionLive = () => {
           )}
 
           {/* Transcript */}
-          <div className="h-[50vh]">
+          <div className="h-[50vh]" ref={transcriptRef}>
             <TranscriptDisplay sessionId={id!} />
           </div>
 
