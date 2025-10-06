@@ -21,6 +21,7 @@ interface TranscriptDisplayProps {
 export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [isDemoRunning, setIsDemoRunning] = useState(false);
   const [wordCount, setWordCount] = useState(0);
   const [lastGeneratedAt, setLastGeneratedAt] = useState(0);
@@ -31,8 +32,28 @@ export const TranscriptDisplay = ({ sessionId }: TranscriptDisplayProps) => {
   useEffect(() => {
     fetchSegments();
     
-    const interval = setInterval(fetchSegments, 5000);
-    return () => clearInterval(interval);
+    // Subscribe to realtime updates for new transcript segments
+    const channel = supabase
+      .channel('transcript-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transcript_segments',
+          filter: `session_id=eq.${sessionId}`
+        },
+        (payload) => {
+          console.log('New transcript segment received:', payload);
+          const newSegment = payload.new as TranscriptSegment;
+          setSegments((current) => [...current, newSegment]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [sessionId]);
 
   useEffect(() => {

@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AudioRecorder } from "./AudioRecorder";
 
 interface SessionControlPanelProps {
   sessionId: string;
@@ -201,6 +202,12 @@ export const SessionControlPanel = ({
               </div>
             )}
           </div>
+
+          {/* Audio Recording Controls */}
+          <AudioRecorder 
+            sessionId={sessionId}
+            isSessionLive={status === "live"}
+          />
 
           {/* Live Analytics */}
           {status === "live" && (
