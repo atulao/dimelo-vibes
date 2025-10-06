@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { NotificationBell } from "./NotificationBell";
 import { GlobalSearch } from "./GlobalSearch";
+import { DevRoleToggle } from "./DevRoleToggle";
 
 export const Navigation = () => {
   const { role, user, loading } = useUserRole();
@@ -143,6 +144,7 @@ export const Navigation = () => {
             ) : (
               <>
                 <GlobalSearch />
+                <DevRoleToggle />
                 <NotificationBell userId={user?.id} />
                 <DropdownMenu>
                 <DropdownMenuTrigger asChild>

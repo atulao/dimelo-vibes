@@ -7,6 +7,9 @@ export const useUserRole = () => {
   const [role, setRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  
+  // Dev mode override - check localStorage for role override
+  const devRoleOverride = localStorage.getItem('dev_role_override') as UserRole;
 
   useEffect(() => {
     fetchUserRole();
@@ -58,5 +61,8 @@ export const useUserRole = () => {
     }
   };
 
-  return { role, loading, user, refetch: fetchUserRole };
+  // Return dev override if set, otherwise return actual role
+  const effectiveRole = devRoleOverride || role;
+  
+  return { role: effectiveRole, loading, user, refetch: fetchUserRole };
 };
