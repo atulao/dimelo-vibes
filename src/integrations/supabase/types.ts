@@ -14,16 +14,379 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_insights: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          insight_type: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          insight_type: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          insight_type?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_insights_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conferences: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          is_active: boolean | null
+          location: string | null
+          name: string
+          organization_id: string
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          location?: string | null
+          name: string
+          organization_id: string
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          location?: string | null
+          name?: string
+          organization_id?: string
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conferences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          created_at: string
+          id: string
+          question: string
+          session_id: string
+          user_id: string | null
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          created_at?: string
+          id?: string
+          question: string
+          session_id: string
+          user_id?: string | null
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          created_at?: string
+          id?: string
+          question?: string
+          session_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_time: string | null
+          id: string
+          is_recording: boolean | null
+          qr_code_url: string | null
+          speaker_bio: string | null
+          speaker_name: string | null
+          start_time: string | null
+          status: Database["public"]["Enums"]["session_status"] | null
+          title: string
+          track_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          is_recording?: boolean | null
+          qr_code_url?: string | null
+          speaker_bio?: string | null
+          speaker_name?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["session_status"] | null
+          title: string
+          track_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          is_recording?: boolean | null
+          qr_code_url?: string | null
+          speaker_bio?: string | null
+          speaker_name?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["session_status"] | null
+          title?: string
+          track_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracks: {
+        Row: {
+          conference_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          conference_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          conference_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracks_conference_id_fkey"
+            columns: ["conference_id"]
+            isOneToOne: false
+            referencedRelation: "conferences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transcript_segments: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          end_time: number | null
+          id: string
+          session_id: string
+          speaker_label: string | null
+          start_time: number | null
+          text: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          end_time?: number | null
+          id?: string
+          session_id: string
+          speaker_label?: string | null
+          start_time?: number | null
+          text: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          end_time?: number | null
+          id?: string
+          session_id?: string
+          speaker_label?: string | null
+          start_time?: number | null
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transcript_segments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_org_access: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "organizer" | "attendee"
+      session_status: "draft" | "scheduled" | "live" | "completed" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +513,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "organizer", "attendee"],
+      session_status: ["draft", "scheduled", "live", "completed", "cancelled"],
+    },
   },
 } as const
