@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-interface Notification {
+export interface Notification {
   id: string;
+  user_id: string;
   type: string;
   title: string;
   message: string;
@@ -19,13 +20,16 @@ export const useNotifications = (userId: string | undefined) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
     fetchNotifications();
 
     // Subscribe to realtime updates
     const channel = supabase
-      .channel('notifications-updates')
+      .channel('notifications-channel')
       .on(
         'postgres_changes',
         {
@@ -39,13 +43,12 @@ export const useNotifications = (userId: string | undefined) => {
           setNotifications((current) => [newNotification, ...current]);
           setUnreadCount((count) => count + 1);
           
-          // Show toast for high-priority notifications
-          if (newNotification.type === 'session_starting') {
-            toast({
-              title: newNotification.title,
-              description: newNotification.message,
-            });
-          }
+          // Show toast for new notification
+          toast({
+            title: newNotification.title,
+            description: newNotification.message,
+            duration: 5000,
+          });
         }
       )
       .on(
@@ -62,7 +65,7 @@ export const useNotifications = (userId: string | undefined) => {
             current.map((n) => (n.id === updatedNotification.id ? updatedNotification : n))
           );
           
-          // Recalculate unread count
+          // Update unread count
           if (updatedNotification.is_read) {
             setUnreadCount((count) => Math.max(0, count - 1));
           }
@@ -79,17 +82,20 @@ export const useNotifications = (userId: string | undefined) => {
     if (!userId) return;
 
     try {
+      // Use wildcard select to get all fields
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(20);
 
       if (error) throw error;
 
-      setNotifications(data || []);
-      setUnreadCount(data?.filter((n) => !n.is_read).length || 0);
+      // Cast to our Notification type since types aren't regenerated yet
+      const typedData = data as unknown as Notification[];
+      setNotifications(typedData || []);
+      setUnreadCount(typedData?.filter((n) => !n.is_read).length || 0);
     } catch (error) {
       console.error("Error fetching notifications:", error);
     } finally {
@@ -122,12 +128,16 @@ export const useNotifications = (userId: string | undefined) => {
 
       if (error) throw error;
 
-      setNotifications((current) =>
-        current.map((n) => ({ ...n, is_read: true }))
-      );
-      setUnreadCount(0);
+      toast({
+        title: "All notifications marked as read",
+      });
     } catch (error) {
       console.error("Error marking all as read:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark notifications as read",
+        variant: "destructive",
+      });
     }
   };
 

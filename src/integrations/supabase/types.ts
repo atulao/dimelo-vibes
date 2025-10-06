@@ -101,7 +101,6 @@ export type Database = {
           link: string | null
           message: string
           title: string
-          type: Database["public"]["Enums"]["notification_type"]
           user_id: string
         }
         Insert: {
@@ -111,7 +110,6 @@ export type Database = {
           link?: string | null
           message: string
           title: string
-          type: Database["public"]["Enums"]["notification_type"]
           user_id: string
         }
         Update: {
@@ -121,7 +119,6 @@ export type Database = {
           link?: string | null
           message?: string
           title?: string
-          type?: Database["public"]["Enums"]["notification_type"]
           user_id?: string
         }
         Relationships: []

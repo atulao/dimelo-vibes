@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { NotificationBell } from "@/components/NotificationBell";
+import { NotificationBell } from "./NotificationBell";
 
 export const Navigation = () => {
   const { role, user, loading } = useUserRole();
