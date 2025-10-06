@@ -583,6 +583,7 @@ export type Database = {
         | "new_insight"
         | "question_upvoted"
       session_status: "draft" | "scheduled" | "live" | "completed" | "cancelled"
+      transcription_provider: "browser" | "whisper"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -719,6 +720,7 @@ export const Constants = {
         "question_upvoted",
       ],
       session_status: ["draft", "scheduled", "live", "completed", "cancelled"],
+      transcription_provider: ["browser", "whisper"],
     },
   },
 } as const

@@ -1,4 +1,7 @@
 project_id = "naxfklhjolvrdlmtgbaq"
 
 [functions.generate-insights]
-verify_jwt = true
+verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = false
