@@ -14,6 +14,7 @@ import { useAttendeeTracking } from "@/hooks/useAttendeeTracking";
 import { useUserRole } from "@/hooks/useUserRole";
 import { SpeakingTimeBreakdown } from "@/components/session/SpeakingTimeBreakdown";
 import { CatchUpPanel } from "@/components/session/CatchUpPanel";
+import { ExportPanel } from "@/components/session/ExportPanel";
 
 const SessionLive = () => {
   const { id } = useParams();
@@ -119,6 +120,31 @@ const SessionLive = () => {
     transcriptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const handleTogglePublic = async () => {
+    try {
+      const { error } = await supabase
+        .from("sessions")
+        .update({ is_public: !session.is_public })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setSession((prev: any) => ({ ...prev, is_public: !prev.is_public }));
+      toast({
+        title: session.is_public ? "Session is now private" : "Session is now public",
+        description: session.is_public 
+          ? "Only authorized users can access this session" 
+          : "Anyone with the link can view this session",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Catch Up Panel */}
@@ -167,14 +193,22 @@ const SessionLive = () => {
 
           {/* Right: Controls + Attendees + AI Insights + Q&A (1 column) */}
           <div className="space-y-6 overflow-y-auto">
-            {isSpeaker && (
+          {isSpeaker && (
+            <>
               <SessionControlPanel 
                 sessionId={id!} 
                 sessionStatus={session.status}
                 onStatusChange={checkAuthAndFetch}
                 expectedSpeakers={session.expected_speakers || []}
               />
-            )}
+              <ExportPanel 
+                sessionId={id!}
+                sessionTitle={session.title}
+                isPublic={session.is_public || false}
+                onTogglePublic={handleTogglePublic}
+              />
+            </>
+          )}
             <AttendeeList sessionId={id!} canViewList={canViewAttendees} />
             {session.expected_speakers && session.expected_speakers.length > 0 && (
               <SpeakingTimeBreakdown sessionId={id!} />
@@ -186,14 +220,22 @@ const SessionLive = () => {
 
         {/* Mobile/Tablet Layout */}
         <div className="lg:hidden space-y-6">
-          {/* Speaker Controls */}
+          {/* Speaker Controls & Export */}
           {isSpeaker && (
-            <SessionControlPanel 
-              sessionId={id!} 
-              sessionStatus={session.status}
-              onStatusChange={checkAuthAndFetch}
-              expectedSpeakers={session.expected_speakers || []}
-            />
+            <>
+              <SessionControlPanel 
+                sessionId={id!} 
+                sessionStatus={session.status}
+                onStatusChange={checkAuthAndFetch}
+                expectedSpeakers={session.expected_speakers || []}
+              />
+              <ExportPanel 
+                sessionId={id!}
+                sessionTitle={session.title}
+                isPublic={session.is_public || false}
+                onTogglePublic={handleTogglePublic}
+              />
+            </>
           )}
 
           {/* Attendees */}

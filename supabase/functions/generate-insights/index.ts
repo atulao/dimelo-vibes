@@ -195,22 +195,24 @@ serve(async (req) => {
     if (isFirstGeneration) {
       userPrompt = `Analyze this conference session transcript and provide insights in the following JSON format.
 
-For EACH insight (key_points, action_items, quotes), identify the approximate timestamp in seconds where that insight occurs in the transcript.
+For EACH insight (key_points, action_items, quotes), identify:
+1. The approximate timestamp in seconds where that insight occurs
+2. A confidence score: "high" (very clear from transcript), "medium" (reasonably clear), or "low" (inferred/uncertain)
 
 {
-  "summary": "A 2-3 sentence summary",
+  "summary": {"text": "A 2-3 sentence summary", "confidence": "high"},
   "key_points": [
-    {"text": "point 1", "timestamp": 45},
-    {"text": "point 2", "timestamp": 120},
-    {"text": "point 3", "timestamp": 180}
+    {"text": "point 1", "timestamp": 45, "confidence": "high"},
+    {"text": "point 2", "timestamp": 120, "confidence": "medium"},
+    {"text": "point 3", "timestamp": 180, "confidence": "high"}
   ],
   "action_items": [
-    {"text": "action 1", "timestamp": 200},
-    {"text": "action 2", "timestamp": 300}
+    {"text": "action 1", "timestamp": 200, "confidence": "high"},
+    {"text": "action 2", "timestamp": 300, "confidence": "medium"}
   ],
   "notable_quotes": [
-    {"text": "quote 1", "timestamp": 90},
-    {"text": "quote 2", "timestamp": 240}
+    {"text": "quote 1", "timestamp": 90, "confidence": "high"},
+    {"text": "quote 2", "timestamp": 240, "confidence": "high"}
   ]
 }
 
@@ -230,17 +232,17 @@ ${newTranscript}
 ${transcript_segments ? `\n\nNEW SEGMENT TIMESTAMPS:\n${transcript_segments.slice(-10).map((s: any) => `[${s.start_time}s] ${s.text.substring(0, 60)}...`).join('\n')}` : ''}
 
 Provide UPDATED insights in the same JSON format, incorporating the new information.
-For new insights, add timestamps. For existing insights, keep their timestamps:
+For new insights, add timestamps and confidence scores. For existing insights, keep their timestamps:
 {
-  "summary": "Updated 2-3 sentence summary that incorporates new content",
+  "summary": {"text": "Updated 2-3 sentence summary", "confidence": "high"},
   "key_points": [
-    {"text": "updated or new point", "timestamp": 180}
+    {"text": "updated or new point", "timestamp": 180, "confidence": "high"}
   ],
   "action_items": [
-    {"text": "updated or new action", "timestamp": 300}
+    {"text": "updated or new action", "timestamp": 300, "confidence": "medium"}
   ],
   "notable_quotes": [
-    {"text": "updated or new quote", "timestamp": 240}
+    {"text": "updated or new quote", "timestamp": 240, "confidence": "high"}
   ]
 }
 
@@ -363,7 +365,8 @@ Keep the best insights from before and add new ones from this segment.`;
       {
         session_id,
         insight_type: 'summary',
-        content: insights.summary || '',
+        content: typeof insights.summary === 'string' ? insights.summary : insights.summary?.text || '',
+        confidence_score: typeof insights.summary === 'object' ? insights.summary?.confidence : 'medium',
         last_processed_word_count: currentWordCount,
         transcript_version: newVersion,
         session_status: session_status || 'in_progress'
@@ -373,6 +376,7 @@ Keep the best insights from before and add new ones from this segment.`;
         insight_type: 'key_point',
         content: typeof point === 'string' ? point : point.text,
         timestamp_seconds: typeof point === 'object' ? point.timestamp : null,
+        confidence_score: typeof point === 'object' ? point.confidence || 'medium' : 'medium',
         last_processed_word_count: currentWordCount,
         transcript_version: newVersion,
         session_status: session_status || 'in_progress'
@@ -382,6 +386,7 @@ Keep the best insights from before and add new ones from this segment.`;
         insight_type: 'action_item',
         content: typeof item === 'string' ? item : item.text,
         timestamp_seconds: typeof item === 'object' ? item.timestamp : null,
+        confidence_score: typeof item === 'object' ? item.confidence || 'medium' : 'medium',
         last_processed_word_count: currentWordCount,
         transcript_version: newVersion,
         session_status: session_status || 'in_progress'
@@ -391,6 +396,7 @@ Keep the best insights from before and add new ones from this segment.`;
         insight_type: 'quote',
         content: typeof quote === 'string' ? quote : quote.text,
         timestamp_seconds: typeof quote === 'object' ? quote.timestamp : null,
+        confidence_score: typeof quote === 'object' ? quote.confidence || 'medium' : 'medium',
         last_processed_word_count: currentWordCount,
         transcript_version: newVersion,
         session_status: session_status || 'in_progress'

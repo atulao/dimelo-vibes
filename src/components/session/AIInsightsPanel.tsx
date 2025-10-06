@@ -3,9 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Brain, Lightbulb, CheckCircle, Quote, RefreshCw } from "lucide-react";
+import { Brain, Lightbulb, CheckCircle, Quote, RefreshCw, Flag, ThumbsUp, ThumbsDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface AIInsightsPanelProps {
   sessionId: string;
@@ -164,6 +169,51 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
     }
   };
 
+  const handleFeedback = async (insightId: string, feedbackType: 'incorrect' | 'helpful' | 'not_helpful') => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('insight_feedback')
+        .upsert({
+          insight_id: insightId,
+          user_id: user.id,
+          feedback_type: feedbackType
+        }, {
+          onConflict: 'insight_id,user_id'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Feedback recorded",
+        description: "Thank you for helping improve our AI insights!",
+      });
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+    }
+  };
+
+  const getConfidenceBadge = (confidence: string | null) => {
+    if (!confidence) return null;
+    
+    const variants: Record<string, { variant: any; label: string; className: string }> = {
+      high: { variant: "default", label: "High confidence", className: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20" },
+      medium: { variant: "secondary", label: "Medium confidence", className: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20" },
+      low: { variant: "outline", label: "Low confidence", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20" }
+    };
+
+    const config = variants[confidence];
+    if (!config) return null;
+
+    return (
+      <Badge variant={config.variant} className={`text-xs ${config.className}`}>
+        {config.label}
+      </Badge>
+    );
+  };
+
   const getTimeAgo = (date: Date) => {
     const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
     
@@ -244,10 +294,54 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
             {/* Summary So Far - Prominent Display */}
             {summary && (
               <div className="bg-primary/5 border-2 border-primary/20 rounded-lg p-4">
-                <h3 className="font-bold text-base mb-3 flex items-center gap-2 text-primary">
-                  <Brain className="h-5 w-5" />
-                  Summary So Far
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-base flex items-center gap-2 text-primary">
+                    <Brain className="h-5 w-5" />
+                    Summary So Far
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {getConfidenceBadge(insights.find(i => i.insight_type === "summary")?.confidence_score)}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <Flag className="h-3 w-3" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48">
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium">Feedback</p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start"
+                            onClick={() => handleFeedback(insights.find(i => i.insight_type === "summary")?.id, 'helpful')}
+                          >
+                            <ThumbsUp className="mr-2 h-3 w-3" />
+                            Helpful
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start"
+                            onClick={() => handleFeedback(insights.find(i => i.insight_type === "summary")?.id, 'not_helpful')}
+                          >
+                            <ThumbsDown className="mr-2 h-3 w-3" />
+                            Not helpful
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start text-destructive"
+                            onClick={() => handleFeedback(insights.find(i => i.insight_type === "summary")?.id, 'incorrect')}
+                          >
+                            <Flag className="mr-2 h-3 w-3" />
+                            Incorrect
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
                 <p className="text-sm leading-relaxed">
                   {summary}
                 </p>
@@ -268,21 +362,67 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
                   <Lightbulb className="h-4 w-4" />
                   Key Points
                 </h3>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-3 text-sm">
                   {keyPoints.slice(0, 7).map((insight) => (
-                    <li key={insight.id} className="flex items-start gap-2">
+                    <li key={insight.id} className="flex items-start gap-2 group">
                       <span className="text-primary mt-0.5">•</span>
-                      <span className="text-muted-foreground flex-1">
-                        {insight.content}
-                        {insight.timestamp_seconds && (
-                          <button
-                            onClick={() => handleTimestampClick(insight.timestamp_seconds)}
-                            className="ml-2 text-xs text-primary hover:underline font-mono"
-                          >
-                            [{formatTimestamp(insight.timestamp_seconds)}]
-                          </button>
-                        )}
-                      </span>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-muted-foreground flex-1">
+                            {insight.content}
+                            {insight.timestamp_seconds && (
+                              <button
+                                onClick={() => handleTimestampClick(insight.timestamp_seconds)}
+                                className="ml-2 text-xs text-primary hover:underline font-mono"
+                              >
+                                [{formatTimestamp(insight.timestamp_seconds)}]
+                              </button>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {getConfidenceBadge(insight.confidence_score)}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                  <Flag className="h-3 w-3" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48">
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium">Feedback</p>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start"
+                                    onClick={() => handleFeedback(insight.id, 'helpful')}
+                                  >
+                                    <ThumbsUp className="mr-2 h-3 w-3" />
+                                    Helpful
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start"
+                                    onClick={() => handleFeedback(insight.id, 'not_helpful')}
+                                  >
+                                    <ThumbsDown className="mr-2 h-3 w-3" />
+                                    Not helpful
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start text-destructive"
+                                    onClick={() => handleFeedback(insight.id, 'incorrect')}
+                                  >
+                                    <Flag className="mr-2 h-3 w-3" />
+                                    Incorrect
+                                  </Button>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -296,21 +436,67 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
                   <CheckCircle className="h-4 w-4" />
                   Action Items
                 </h3>
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-3 text-sm">
                   {actionItems.slice(0, 5).map((insight) => (
-                    <li key={insight.id} className="flex items-start gap-2">
+                    <li key={insight.id} className="flex items-start gap-2 group">
                       <span className="text-primary mt-0.5">→</span>
-                      <span className="text-muted-foreground flex-1">
-                        {insight.content}
-                        {insight.timestamp_seconds && (
-                          <button
-                            onClick={() => handleTimestampClick(insight.timestamp_seconds)}
-                            className="ml-2 text-xs text-primary hover:underline font-mono"
-                          >
-                            [{formatTimestamp(insight.timestamp_seconds)}]
-                          </button>
-                        )}
-                      </span>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-muted-foreground flex-1">
+                            {insight.content}
+                            {insight.timestamp_seconds && (
+                              <button
+                                onClick={() => handleTimestampClick(insight.timestamp_seconds)}
+                                className="ml-2 text-xs text-primary hover:underline font-mono"
+                              >
+                                [{formatTimestamp(insight.timestamp_seconds)}]
+                              </button>
+                            )}
+                          </span>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {getConfidenceBadge(insight.confidence_score)}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                  <Flag className="h-3 w-3" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48">
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium">Feedback</p>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start"
+                                    onClick={() => handleFeedback(insight.id, 'helpful')}
+                                  >
+                                    <ThumbsUp className="mr-2 h-3 w-3" />
+                                    Helpful
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start"
+                                    onClick={() => handleFeedback(insight.id, 'not_helpful')}
+                                  >
+                                    <ThumbsDown className="mr-2 h-3 w-3" />
+                                    Not helpful
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start text-destructive"
+                                    onClick={() => handleFeedback(insight.id, 'incorrect')}
+                                  >
+                                    <Flag className="mr-2 h-3 w-3" />
+                                    Incorrect
+                                  </Button>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -328,11 +514,55 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatu
                   {quotes.slice(0, 3).map((insight) => (
                     <div
                       key={insight.id}
-                      className="p-3 bg-muted/50 rounded-md border-l-2 border-primary"
+                      className="p-3 bg-muted/50 rounded-md border-l-2 border-primary group relative"
                     >
-                      <p className="text-sm italic text-muted-foreground">
-                        "{insight.content}"
-                      </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm italic text-muted-foreground flex-1">
+                          "{insight.content}"
+                        </p>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {getConfidenceBadge(insight.confidence_score)}
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                <Flag className="h-3 w-3" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48">
+                              <div className="space-y-2">
+                                <p className="text-xs font-medium">Feedback</p>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start"
+                                  onClick={() => handleFeedback(insight.id, 'helpful')}
+                                >
+                                  <ThumbsUp className="mr-2 h-3 w-3" />
+                                  Helpful
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start"
+                                  onClick={() => handleFeedback(insight.id, 'not_helpful')}
+                                >
+                                  <ThumbsDown className="mr-2 h-3 w-3" />
+                                  Not helpful
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full justify-start text-destructive"
+                                  onClick={() => handleFeedback(insight.id, 'incorrect')}
+                                >
+                                  <Flag className="mr-2 h-3 w-3" />
+                                  Incorrect
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
                       {insight.timestamp_seconds && (
                         <button
                           onClick={() => handleTimestampClick(insight.timestamp_seconds)}

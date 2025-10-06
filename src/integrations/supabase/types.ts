@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       ai_insights: {
         Row: {
+          confidence_score: string | null
           content: string
           created_at: string
           id: string
@@ -30,6 +31,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          confidence_score?: string | null
           content: string
           created_at?: string
           id?: string
@@ -44,6 +46,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          confidence_score?: string | null
           content?: string
           created_at?: string
           id?: string
@@ -120,6 +123,41 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insight_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          feedback_type: string
+          id: string
+          insight_id: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          feedback_type: string
+          id?: string
+          insight_id: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          feedback_type?: string
+          id?: string
+          insight_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insight_feedback_insight_id_fkey"
+            columns: ["insight_id"]
+            isOneToOne: false
+            referencedRelation: "ai_insights"
             referencedColumns: ["id"]
           },
         ]
