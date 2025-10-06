@@ -10,9 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 interface AIInsightsPanelProps {
   sessionId: string;
   canRegenerate?: boolean;
+  sessionStatus?: string;
 }
 
-export const AIInsightsPanel = ({ sessionId, canRegenerate = false }: AIInsightsPanelProps) => {
+export const AIInsightsPanel = ({ sessionId, canRegenerate = false, sessionStatus }: AIInsightsPanelProps) => {
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [insights, setInsights] = useState<any[]>([]);
@@ -40,10 +41,20 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false }: AIInsights
       )
       .subscribe();
     
+    // Auto-refresh every 2 minutes if session is live
+    let refreshInterval: NodeJS.Timeout | undefined;
+    if (sessionStatus === 'live') {
+      refreshInterval = setInterval(() => {
+        console.log('Auto-refreshing insights (2min interval)...');
+        fetchInsights();
+      }, 2 * 60 * 1000); // 2 minutes
+    }
+    
     return () => {
       supabase.removeChannel(channel);
+      if (refreshInterval) clearInterval(refreshInterval);
     };
-  }, [sessionId]);
+  }, [sessionId, sessionStatus]);
 
   const fetchInsights = async () => {
     try {
@@ -128,6 +139,18 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false }: AIInsights
     }
   };
 
+  const getTimeAgo = (date: Date) => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    
+    if (seconds < 60) return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+  };
+
   const summary = insights.find(i => i.insight_type === "summary")?.content;
   const keyPoints = insights.filter(i => i.insight_type === "key_point");
   const actionItems = insights.filter(i => i.insight_type === "action_item");
@@ -156,7 +179,12 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false }: AIInsights
         </div>
         {lastUpdated && (
           <p className="text-xs text-muted-foreground">
-            Last updated: {lastUpdated.toLocaleTimeString()}
+            Last updated: {getTimeAgo(lastUpdated)}
+          </p>
+        )}
+        {sessionStatus === 'live' && insights.length > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Auto-updating every 2 minutes during live session
           </p>
         )}
       </CardHeader>
@@ -180,16 +208,23 @@ export const AIInsightsPanel = ({ sessionId, canRegenerate = false }: AIInsights
           </div>
         ) : (
           <>
-            {/* Summary */}
+            {/* Summary So Far - Prominent Display */}
             {summary && (
-              <div>
-                <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                  <Brain className="h-4 w-4" />
-                  Summary
+              <div className="bg-primary/5 border-2 border-primary/20 rounded-lg p-4">
+                <h3 className="font-bold text-base mb-3 flex items-center gap-2 text-primary">
+                  <Brain className="h-5 w-5" />
+                  Summary So Far
                 </h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-sm leading-relaxed">
                   {summary}
                 </p>
+                {sessionStatus === 'live' && (
+                  <div className="mt-3 pt-3 border-t border-primary/20">
+                    <p className="text-xs text-muted-foreground">
+                      💡 This summary updates automatically every 2 minutes to help latecomers catch up
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

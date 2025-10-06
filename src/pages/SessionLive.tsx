@@ -134,7 +134,7 @@ const SessionLive = () => {
               />
             )}
             <AttendeeList sessionId={id!} canViewList={canViewAttendees} />
-            <AIInsightsPanel sessionId={id!} canRegenerate={isSpeaker} />
+            <AIInsightsPanel sessionId={id!} canRegenerate={isSpeaker} sessionStatus={session.status} />
             <QASection sessionId={id!} />
           </div>
         </div>
@@ -159,7 +159,7 @@ const SessionLive = () => {
           </div>
 
           {/* AI Insights */}
-          <AIInsightsPanel sessionId={id!} canRegenerate={isSpeaker} />
+          <AIInsightsPanel sessionId={id!} canRegenerate={isSpeaker} sessionStatus={session.status} />
 
           {/* Q&A */}
           <QASection sessionId={id!} />
