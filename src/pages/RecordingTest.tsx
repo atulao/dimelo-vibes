@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TranscriptSegment {
   id: string;
@@ -22,6 +23,8 @@ export default function RecordingTest() {
   const [isPaused, setIsPaused] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
+  const [aiSummary, setAiSummary] = useState<string>("");
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null);
@@ -241,6 +244,45 @@ export default function RecordingTest() {
       setIsPaused(false);
       setIsProcessing(true);
       setAudioLevel(0);
+    }
+  };
+
+  const generateSummary = async () => {
+    if (transcriptSegments.length === 0) {
+      toast({
+        title: "No transcript available",
+        description: "Record something first to generate a summary",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGeneratingSummary(true);
+    try {
+      const fullTranscript = transcriptSegments.map(s => s.text).join(' ');
+      
+      const { data, error } = await supabase.functions.invoke('generate-summary', {
+        body: { transcript: fullTranscript }
+      });
+
+      if (error) throw error;
+
+      if (data?.summary) {
+        setAiSummary(data.summary);
+        toast({
+          title: "Summary Generated",
+          description: "AI has analyzed the transcript",
+        });
+      }
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      toast({
+        title: "Failed to generate summary",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingSummary(false);
     }
   };
 
@@ -619,15 +661,42 @@ export default function RecordingTest() {
 
         {transcriptSegments.length > 0 && (
           <Card>
-            <CardHeader>
-              <CardTitle>Summary</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle>AI Summary</CardTitle>
+              <Button 
+                onClick={generateSummary}
+                disabled={isGeneratingSummary}
+                variant="outline"
+                size="sm"
+              >
+                {isGeneratingSummary ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate Summary
+                  </>
+                )}
+              </Button>
             </CardHeader>
             <CardContent>
-              <div className="p-4 border rounded-lg bg-muted/50">
-                <p className="text-sm leading-relaxed">
-                  {transcriptSegments.map(s => s.text).join(' ')}
-                </p>
-              </div>
+              {aiSummary ? (
+                <div className="p-4 border rounded-lg bg-muted/50">
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {aiSummary}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-muted-foreground">
+                  <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Click "Generate Summary" to create a comprehensive AI-powered summary of your transcript</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
