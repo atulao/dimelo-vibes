@@ -459,31 +459,6 @@ export default function SessionReplay() {
           </div>
 
           <div className="space-y-6">
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">AI Insights</h2>
-              <div className="space-y-4">
-                {insights.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    No AI insights available yet.
-                  </p>
-                ) : (
-                  insights.map((insight) => (
-                    <div
-                      key={insight.id}
-                      className="p-4 bg-muted/50 rounded-lg"
-                    >
-                      <Badge className="mb-2" variant="secondary">
-                        {insight.insight_type}
-                      </Badge>
-                      <p className="text-sm whitespace-pre-wrap">
-                        {insight.content}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-
             <QASection sessionId={id || ""} />
           </div>
         </div>
