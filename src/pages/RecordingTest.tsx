@@ -51,7 +51,8 @@ export default function RecordingTest() {
   const summaryRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chunkIntervalRef = useRef<NodeJS.Timeout>();
-  const lastProcessedChunkRef = useRef<number>(0);
+  const lastProcessedDurationRef = useRef<number>(0);
+  const accumulatedChunksRef = useRef<Blob[]>([]);
   
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -172,19 +173,26 @@ export default function RecordingTest() {
       setupAudioAnalyser(stream);
       
       const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      const allChunks: Blob[] = [];
-      let lastTranscribedDuration = 0; // Track what we've already transcribed
+      accumulatedChunksRef.current = [];
+      lastProcessedDurationRef.current = 0;
       
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          allChunks.push(e.data);
+          console.log('Received audio chunk:', e.data.size, 'bytes');
+          accumulatedChunksRef.current.push(e.data);
         }
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(allChunks, { type: 'audio/webm' });
+        console.log('Recording stopped, processing final audio...');
+        const audioBlob = new Blob(accumulatedChunksRef.current, { type: 'audio/webm' });
         setRecordedAudioBlob(audioBlob);
-        // Don't process the full audio again since we've been processing chunks
+        
+        // Process any remaining audio that hasn't been transcribed yet
+        if (accumulatedChunksRef.current.length > 0) {
+          await processAccumulatedAudio(audioBlob, lastProcessedDurationRef.current);
+        }
+        
         setIsProcessing(false);
         
         // Cleanup
@@ -207,16 +215,21 @@ export default function RecordingTest() {
       setMediaRecorder(recorder);
       setIsRecording(true);
       setIsAutoAnalyzing(true);
-      setAudioChunks(allChunks);
 
-      // Set up interval to transcribe accumulated audio every 30 seconds
+      // Set up interval to request data and transcribe every 30 seconds
       chunkIntervalRef.current = setInterval(async () => {
-        if (recorder.state === 'recording' && allChunks.length > 0) {
-          console.log('Processing accumulated audio...');
-          // Create a blob from all chunks accumulated so far
-          const fullBlob = new Blob(allChunks, { type: 'audio/webm' });
-          await processAccumulatedAudio(fullBlob, lastTranscribedDuration);
-          lastTranscribedDuration = 30 * Math.floor(allChunks.length / 1); // Rough estimate
+        if (recorder.state === 'recording') {
+          console.log('Requesting data for 30-second transcription...');
+          // Request data to trigger ondataavailable
+          recorder.requestData();
+          
+          // Wait a bit for the data to be added to accumulatedChunksRef
+          setTimeout(async () => {
+            if (accumulatedChunksRef.current.length > 0) {
+              const fullBlob = new Blob(accumulatedChunksRef.current, { type: 'audio/webm' });
+              await processAccumulatedAudio(fullBlob, lastProcessedDurationRef.current);
+            }
+          }, 100);
         }
       }, 30000);
 
@@ -688,6 +701,7 @@ export default function RecordingTest() {
 
   const processAccumulatedAudio = async (audioBlob: Blob, lastDuration: number) => {
     try {
+      console.log(`Transcribing accumulated audio (last duration: ${lastDuration}s)...`);
       const reader = new FileReader();
       reader.onloadend = async () => {
         try {
@@ -716,6 +730,7 @@ export default function RecordingTest() {
           }
 
           const data = await response.json();
+          console.log('Transcription response:', data);
           
           if (data.segments && data.segments.length > 0) {
             // Only add segments that are NEW (after the last transcribed duration)
@@ -734,8 +749,15 @@ export default function RecordingTest() {
               setTranscriptSegments(prev => [...prev, ...newSegments]);
               console.log(`Added ${newSegments.length} new transcript segments`);
               
+              // Update the last processed duration to the end of the last segment
+              const lastSegment = data.segments[data.segments.length - 1];
+              lastProcessedDurationRef.current = lastSegment.end;
+              console.log(`Updated last processed duration to ${lastSegment.end}s`);
+              
               // Generate rolling summary after adding new segments
               await generateRollingSummary();
+            } else {
+              console.log('No new segments to add (all already transcribed)');
             }
           } else if (data.text) {
             const newSegment: TranscriptSegment = {
