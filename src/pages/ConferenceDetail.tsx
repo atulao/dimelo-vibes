@@ -110,7 +110,9 @@ const ConferenceDetail = () => {
         .order("start_time", { ascending: true });
 
       if (error) throw error;
-      setSessions(data || []);
+      // Filter out sessions where tracks is null (tracks that don't belong to this conference)
+      const filteredSessions = data?.filter(session => session.tracks !== null) || [];
+      setSessions(filteredSessions);
     } catch (error: any) {
       toast({
         title: "Error",
