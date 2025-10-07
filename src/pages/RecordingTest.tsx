@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare, FileDown } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare, FileDown, Upload } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -45,7 +45,9 @@ export default function RecordingTest() {
   const [isBrowserSupported, setIsBrowserSupported] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState("auto");
   const [averageConfidence, setAverageConfidence] = useState<number | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const summaryRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -388,6 +390,110 @@ export default function RecordingTest() {
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/m4a'];
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(webm|mp4|mp3|wav|ogg|m4a)$/i)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an audio file (webm, mp4, mp3, wav, ogg, m4a)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (max 25MB for Whisper API)
+    if (file.size > 25 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 25MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsUploadingFile(true);
+    setIsProcessing(true);
+
+    try {
+      // Read file as array buffer
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      
+      // Convert to base64
+      let binary = '';
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Audio = btoa(binary);
+
+      console.log(`Uploading file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+
+      // Send to transcription API
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: { 
+          audio: base64Audio,
+          sessionId: 'upload-session',
+          language: selectedLanguage === 'auto' ? undefined : selectedLanguage
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.segments && data.segments.length > 0) {
+        const newSegments: TranscriptSegment[] = data.segments.map((seg: any, index: number) => ({
+          id: `${Date.now()}-${index}`,
+          text: seg.text,
+          timestamp: new Date(seg.start * 1000).toISOString().substr(14, 5),
+          confidence: seg.confidence,
+          start: seg.start,
+          end: seg.end,
+        }));
+        
+        setTranscriptSegments(newSegments);
+        
+        if (data.averageConfidence !== null) {
+          setAverageConfidence(data.averageConfidence);
+        }
+        
+        toast({
+          title: "Transcription complete",
+          description: `Processed ${file.name} successfully. Language: ${data.language || 'Unknown'}`,
+        });
+      } else if (data.text) {
+        const newSegment: TranscriptSegment = {
+          id: Date.now().toString(),
+          text: data.text,
+          timestamp: new Date().toLocaleTimeString(),
+        };
+        
+        setTranscriptSegments([newSegment]);
+        
+        toast({
+          title: "Transcription complete",
+          description: `Processed ${file.name} successfully`,
+        });
+      }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      toast({
+        title: "Processing failed",
+        description: error instanceof Error ? error.message : "Failed to process audio file",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploadingFile(false);
+      setIsProcessing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const playAudio = () => {
     if (audioRef.current && recordedAudioBlob) {
       if (isPlaying) {
@@ -631,12 +737,48 @@ export default function RecordingTest() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mic className="h-5 w-5" />
-              Recording Controls
+              Audio Recording & Analysis
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              {!isRecording && !isProcessing && (
+            {/* File Upload Section */}
+            <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg border">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="audio/*,.webm,.mp4,.mp3,.wav,.ogg,.m4a"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="audio-file-upload"
+              />
+              <label htmlFor="audio-file-upload">
+                <Button 
+                  variant="outline"
+                  disabled={isRecording || isUploadingFile}
+                  asChild
+                >
+                  <span className="cursor-pointer">
+                    {isUploadingFile ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload Audio File
+                      </>
+                    )}
+                  </span>
+                </Button>
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Upload a previous recording to transcribe and analyze (max 25MB)
+              </p>
+            </div>
+
+            {/* Recording Controls */}
+            <div className="flex items-center gap-4 flex-wrap">{!isRecording && !isProcessing && (
                 <Button
                   onClick={startRecording}
                   size="lg"
