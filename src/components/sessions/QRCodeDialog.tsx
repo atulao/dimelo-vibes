@@ -23,7 +23,7 @@ interface QRCodeDialogProps {
 export const QRCodeDialog = ({ session, open, onOpenChange }: QRCodeDialogProps) => {
   if (!session) return null;
 
-  const sessionUrl = `${window.location.origin}/session/${session.id}`;
+  const sessionUrl = `${window.location.origin}/session/${session.id}/replay`;
 
   const downloadQRCode = () => {
     const svg = document.getElementById("qr-code-svg");

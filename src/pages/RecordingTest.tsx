@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare, FileDown, Upload, Save, QrCode } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare, FileDown, Upload, Save, QrCode, ExternalLink } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1367,9 +1367,17 @@ export default function RecordingTest() {
                   </Button>
                   <Button 
                     onClick={() => navigate(`/session/${savedSession.id}/replay`)}
+                    variant="outline"
                     className="flex-1"
                   >
+                    <ExternalLink className="mr-2 h-4 w-4" />
                     View Session
+                  </Button>
+                  <Button 
+                    onClick={() => navigate('/recorded-sessions')}
+                    className="flex-1"
+                  >
+                    All Sessions
                   </Button>
                 </div>
               </div>

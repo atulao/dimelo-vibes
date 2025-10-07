@@ -15,6 +15,7 @@ import {
   Lock,
   Unlock,
   Copy,
+  MessageSquare,
 } from "lucide-react";
 import {
   Dialog,
@@ -27,6 +28,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { QASection } from "@/components/session/QASection";
 
 interface TranscriptSegment {
   id: string;
@@ -481,6 +483,8 @@ export default function SessionReplay() {
                 )}
               </div>
             </Card>
+
+            <QASection sessionId={id || ""} />
           </div>
         </div>
       </div>
