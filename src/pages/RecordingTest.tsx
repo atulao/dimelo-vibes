@@ -19,6 +19,7 @@ interface TranscriptSegment {
 
 export default function RecordingTest() {
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
@@ -213,10 +214,31 @@ export default function RecordingTest() {
     }
   };
 
+  const pauseRecording = () => {
+    if (mediaRecorder && isRecording && !isPaused) {
+      mediaRecorder.pause();
+      setIsPaused(true);
+      toast({
+        title: "Recording Paused",
+      });
+    }
+  };
+
+  const resumeRecording = () => {
+    if (mediaRecorder && isRecording && isPaused) {
+      mediaRecorder.resume();
+      setIsPaused(false);
+      toast({
+        title: "Recording Resumed",
+      });
+    }
+  };
+
   const stopRecording = () => {
     if (mediaRecorder && isRecording) {
       mediaRecorder.stop();
       setIsRecording(false);
+      setIsPaused(false);
       setIsProcessing(true);
       setAudioLevel(0);
     }
@@ -484,6 +506,26 @@ export default function RecordingTest() {
 
               {isRecording && (
                 <>
+                  {!isPaused ? (
+                    <Button
+                      onClick={pauseRecording}
+                      size="lg"
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
+                      <Pause className="h-5 w-5" />
+                      Pause
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={resumeRecording}
+                      size="lg"
+                      className="flex items-center gap-2"
+                    >
+                      <Play className="h-5 w-5" />
+                      Resume
+                    </Button>
+                  )}
                   <Button
                     onClick={stopRecording}
                     size="lg"
@@ -493,9 +535,9 @@ export default function RecordingTest() {
                     <Square className="h-5 w-5" />
                     Stop Recording
                   </Button>
-                  <Badge variant="destructive" className="animate-pulse">
+                  <Badge variant={isPaused ? "secondary" : "destructive"} className={isPaused ? "" : "animate-pulse"}>
                     <div className="w-2 h-2 rounded-full bg-white mr-2" />
-                    {formatTime(recordingTime)}
+                    {formatTime(recordingTime)} {isPaused && "(Paused)"}
                   </Badge>
                 </>
               )}
@@ -570,6 +612,21 @@ export default function RecordingTest() {
                   step={1}
                   className="w-full"
                 />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {transcriptSegments.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 border rounded-lg bg-muted/50">
+                <p className="text-sm leading-relaxed">
+                  {transcriptSegments.map(s => s.text).join(' ')}
+                </p>
               </div>
             </CardContent>
           </Card>
