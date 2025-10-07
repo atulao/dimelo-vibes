@@ -469,43 +469,6 @@ export default function SessionReplay() {
             </Card>
 
             <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Transcript</h2>
-              <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                {segments.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    No transcript available for this session.
-                  </p>
-                ) : (
-                  segments.map((segment) => (
-                    <div
-                      key={segment.id}
-                      onClick={() => handleSegmentClick(segment.start_time)}
-                      className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                        activeSegmentId === segment.id
-                          ? "bg-primary/10 border-l-4 border-primary"
-                          : "bg-muted/50 hover:bg-muted"
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <Badge variant="outline" className="shrink-0">
-                          {formatTime(segment.start_time)}
-                        </Badge>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium mb-1">
-                            {segment.speaker_label || "Speaker"}
-                          </p>
-                          <p className="text-sm">{segment.text}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card className="p-6">
               <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
                 <MessageSquare className="h-5 w-5" />
                 Ask Questions
@@ -558,6 +521,41 @@ export default function SessionReplay() {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold mb-4">Transcript</h2>
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {segments.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    No transcript available for this session.
+                  </p>
+                ) : (
+                  segments.map((segment) => (
+                    <div
+                      key={segment.id}
+                      onClick={() => handleSegmentClick(segment.start_time)}
+                      className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                        activeSegmentId === segment.id
+                          ? "bg-primary/10 border-l-4 border-primary"
+                          : "bg-muted/50 hover:bg-muted"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Badge variant="outline" className="shrink-0">
+                          {formatTime(segment.start_time)}
+                        </Badge>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium mb-1">
+                            {segment.speaker_label || "Speaker"}
+                          </p>
+                          <p className="text-sm">{segment.text}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </Card>
