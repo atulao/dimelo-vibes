@@ -757,11 +757,19 @@ export default function RecordingTest() {
             </CardHeader>
             <CardContent>
               {aiSummary ? (
-                <div className="p-4 border rounded-lg bg-muted/50">
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {aiSummary}
-                    </p>
+                <div className="bg-background shadow-lg rounded-lg overflow-hidden">
+                  <div className="p-8 md:p-12 max-h-[600px] overflow-y-auto">
+                    <div className="prose prose-slate dark:prose-invert max-w-none
+                      prose-headings:font-bold prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-0
+                      prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:border-b prose-h2:pb-2
+                      prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-3
+                      prose-p:my-4 prose-p:leading-7
+                      prose-ul:my-4 prose-li:my-1
+                      prose-strong:font-semibold prose-strong:text-foreground
+                      prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:my-4
+                      prose-hr:my-8 prose-hr:border-border">
+                      <div className="whitespace-pre-wrap">{aiSummary}</div>
+                    </div>
                   </div>
                 </div>
               ) : (

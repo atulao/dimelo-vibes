@@ -48,130 +48,125 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are an expert conference session analyst. Create professional, scannable summaries optimized for PDF export that provide maximum value to attendees and non-attendees.`
+            content: `You are an expert conference session analyst. Create professional, educational summaries that work as comprehensive study guides.`
           },
           {
             role: "user",
-            content: `# Generate Conference Session Summary
+            content: `Generate a professional, educational summary
 
-Analyze the provided conference session transcript and create a professional, scannable summary optimized for PDF export.
+## CONTEXT:
+- **Session**: ${session_title}
+- **Speaker**: ${speaker_name}
+- **Conference**: ${conference_name}
+- **Duration**: ${duration_minutes} minutes
+- **Transcript**: ${transcript_word_count} words
 
-## CONTEXT PROVIDED:
-- Session: ${session_title}
-- Speaker: ${speaker_name} (${speaker_bio})
-- Duration: ${duration_minutes} minutes
-- Track: ${track_name}
-- Conference: ${conference_name}
-- Transcript: ${transcript_word_count} words
+## OUTPUT STRUCTURE:
 
-## REQUIRED OUTPUT STRUCTURE:
+# [Session Title]: [Compelling Subtitle]
 
-### 📋 EXECUTIVE SUMMARY (150 words max)
-[3-4 sentence paragraph answering: What is this about? What's the main insight? Who should care?]
+## Introduction
+[2-3 paragraph overview that sets the stage. Answer: What is this about? Why does it matter? What will readers learn?]
 
-**🎯 Bottom Line**: [Single most important takeaway - one sentence, bold]
+## Speaker Introduction
+**${speaker_name}**: [Title, Company, relevant background in 2-3 sentences. Make it personal and credible.]
 
-**👥 Best For**: [Target audience description]
-
----
-
-### 🔥 TOP 5 KEY INSIGHTS (Ranked by importance)
-
-**1. [Compelling insight title - make it a headline]**
-- **What**: [2 sentence explanation]
-- **Why it matters**: [Impact/significance - 1 sentence]  
-- **Evidence**: [Specific data, quote, or example - 1 sentence]
-- 📍 [Timestamp] in transcript
-
-**[Label: 🔥 CRITICAL | ⚡ KEY | 💡 INTERESTING]**
-
-[Repeat for insights 2-5]
+[If panel/multiple speakers, list each with same format]
 
 ---
 
-### 💬 MEMORABLE QUOTES (3-5 quotes)
+## [Main Topic 1 - Make it a Compelling Title]
+[Opening paragraph that introduces the topic]
 
-> "[Exact quote - choose most impactful/surprising/actionable]"
-> — ${speaker_name} [[MM:SS]]
+**Key Concept**: [If there's an important term, define it inline with bold label]
 
----
+- **Subtopic A**: [2-3 sentence explanation with specific details]
+  - Supporting point with example
+  - Data point or quote if available
+  
+- **Subtopic B**: [2-3 sentence explanation]
+  - Real-world application
+  - Impact or consequence
 
-### ✅ ACTION ITEMS
+> "[Use a compelling quote here if it captures the essence]"
+> — ${speaker_name}
 
-**🚀 Do This Week:**
-- [ ] [Specific, actionable item with clear outcome]
-- [ ] [Specific, actionable item with clear outcome]
-- [ ] [Specific, actionable item with clear outcome]
-
-**🎯 Strategic Considerations:**
-- [ ] [Longer-term strategic consideration]
-- [ ] [Longer-term strategic consideration]
-
----
-
-### 🤔 KEY QUESTIONS ADDRESSED
-
-**Q: [Most important question discussed]**  
-A: [Concise answer - 2 sentences max] [[Timestamp]]
-
-[3-4 most valuable Q&As]
+[Continue with 2-3 more paragraphs exploring this topic in depth]
 
 ---
 
-### 📚 RESOURCES & REFERENCES
+## [Main Topic 2 - Another Compelling Title]
+[Same structure as Topic 1]
 
-**🎓 Experts/People Mentioned**: [Name - Context why mentioned]  
-**🏢 Companies/Products**: [Name - Relevance to discussion]  
-**📊 Studies/Data**: [Citation - Key finding]  
-**🛠️ Tools/Frameworks**: [Name - How to use it]
+**Real-World Example**: [Title for example]
+[Describe a specific scenario or case study mentioned. Make it concrete and relatable. Use storytelling elements:]
+- What was the problem?
+- What solution was implemented?
+- What was the outcome?
+
+[Continue pattern...]
 
 ---
 
-### 🔗 MORE INFORMATION
+## [Main Topic 3-7]
+[Repeat structure for remaining major topics]
 
-**Full Transcript**: Available with timestamps  
-**Speaker Contact**: ${speaker_name}  
-**Session Track**: ${track_name}
+---
+
+## Key Takeaways
+[If the session had clear action items or lessons, summarize them here in a concise list]
 
 ---
 
 ## FORMATTING RULES:
 
-**Structure:**
-- Total length: 1000-1500 words (2-3 PDF pages)
-- Hierarchical headers with emoji
-- Short paragraphs (3-4 lines max)
-- Bullet points for lists
-- Consistent spacing between sections
+**Typography Hierarchy:**
+- H1: Session title + subtitle
+- H2: Major topic sections (5-10 total)
+- H3: Subtopics (use sparingly)
+- Bold: Key terms, names, important concepts
+- Italic: Emphasis, book/product names
+- > Quote blocks: Impactful statements
+
+**Content Guidelines:**
+- **Paragraph length**: 3-5 sentences maximum
+- **Bullet depth**: Maximum 2 levels
+- **Section length**: 1-3 pages per major topic
+- **Quote usage**: 1-2 quotes per major section
+- **Examples**: At least 1 concrete example per major topic
+- **Definitions**: Inline bold labels for jargon
 
 **Writing Style:**
-- Professional but conversational
-- Active voice
-- Specific examples over vague statements
-- Technical terms defined on first use
-- Write for someone in a hurry
+- Educational and explanatory (not just summarizing)
+- Third person, professional but accessible
+- Active voice ("Speaker explained" not "It was explained")
+- Connect concepts logically between sections
+- Use transition sentences between topics
+- Tell a cohesive story, not disjointed facts
 
-**Emphasis:**
-- **Bold** for key terms and outcomes
-- *Italic* for quotes and emphasis  
-- 📍 Timestamps for reference
-- 🔥⚡💡 Icons to signal importance
-- [ ] Checkboxes for action items
+**Content Priorities:**
+1. **Context first**: Who's speaking and why it matters
+2. **Concepts over quotes**: Explain ideas thoroughly
+3. **Real examples**: Concrete scenarios over abstract theory
+4. **Logical flow**: Each section builds on previous
+5. **Actionable**: Include what to DO with information
+6. **Complete thoughts**: Don't leave ideas hanging
 
-## CRITICAL INSTRUCTIONS:
-
-1. **Prioritize ruthlessly**: Only include insights that are NEW, SURPRISING, or ACTIONABLE
-2. **Be specific**: Use numbers, names, examples - avoid generic advice
-3. **Show hierarchy**: Most critical info first, progressively more detail
-4. **Link everything**: Every claim needs a timestamp reference
-5. **Make it scannable**: Someone should grasp main points in 2 minutes
-6. **Add value**: Don't just summarize - synthesize and provide context
+**Quality Checks:**
+✅ Does introduction give clear overview?
+✅ Are speakers properly introduced with credibility?
+✅ Does each major section have a clear focus?
+✅ Are technical terms defined when introduced?
+✅ Are there concrete examples throughout?
+✅ Does content flow logically from section to section?
+✅ Is the tone educational and professional?
+✅ Would this work as a study guide or reference?
 
 ## TRANSCRIPT:
 
 ${transcript}
 
-Now generate the summary following this exact structure.`
+Now generate the summary following this exact structure and style.`
           }
         ],
       }),
