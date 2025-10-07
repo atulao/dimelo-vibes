@@ -1016,7 +1016,7 @@ export default function RecordingTest() {
 
               {qaConversation.length > 0 && (
                 <div className="space-y-3">
-                  {qaConversation.map((msg, idx) => (
+                  {[...qaConversation].reverse().map((msg, idx) => (
                     <div
                       key={idx}
                       className={`p-3 rounded-lg ${
