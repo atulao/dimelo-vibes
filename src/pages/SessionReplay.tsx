@@ -110,7 +110,10 @@ export default function SessionReplay() {
     };
 
     const handleCanPlay = () => {
-      console.log("Audio can play, ready state:", audio.readyState);
+      console.log("Audio can play, ready state:", audio.readyState, "duration:", audio.duration);
+      if (audio.duration && audio.duration !== Infinity) {
+        setDuration(audio.duration);
+      }
     };
 
     audio.addEventListener("timeupdate", handleTimeUpdate);
@@ -118,6 +121,17 @@ export default function SessionReplay() {
     audio.addEventListener("ended", handleEnded);
     audio.addEventListener("error", handleError);
     audio.addEventListener("canplay", handleCanPlay);
+
+    // Force load metadata
+    if (session?.recording_url) {
+      audio.load();
+    }
+
+    // If metadata is already loaded, set duration immediately
+    if (audio.readyState >= 1 && audio.duration && audio.duration !== Infinity) {
+      console.log("Metadata already loaded:", audio.duration);
+      setDuration(audio.duration);
+    }
 
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);

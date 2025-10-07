@@ -55,13 +55,24 @@ export const SessionCard = ({ session, onEdit, onDelete, onGenerateQR }: Session
       console.error('Audio error for', session.title, e);
     };
 
+    const handleCanPlay = () => {
+      console.log('Can play, duration:', audio.duration);
+      if (audio.duration && audio.duration !== Infinity) {
+        setDuration(audio.duration);
+      }
+    };
+
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
+    audio.addEventListener('canplay', handleCanPlay);
+
+    // Force load metadata
+    audio.load();
 
     // If metadata is already loaded, set duration immediately
-    if (audio.readyState >= 1) {
+    if (audio.readyState >= 1 && audio.duration && audio.duration !== Infinity) {
       console.log('Metadata already loaded:', audio.duration);
       setDuration(audio.duration);
     }
@@ -71,6 +82,7 @@ export const SessionCard = ({ session, onEdit, onDelete, onGenerateQR }: Session
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
+      audio.removeEventListener('canplay', handleCanPlay);
     };
   }, [session.recording_url, session.title]);
 
