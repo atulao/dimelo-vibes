@@ -40,7 +40,9 @@ export default function RecordingTest() {
   const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState([80]);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [audioLevel, setAudioLevel] = useState(0);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>("");
@@ -130,14 +132,35 @@ export default function RecordingTest() {
 
   // Audio playback controls
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume[0] / 100;
-    }
-  }, [volume]);
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration);
+    };
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("ended", handleEnded);
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [recordedAudioBlob]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -737,15 +760,25 @@ export default function RecordingTest() {
     }
   };
 
-  const playAudio = () => {
+  const playAudio = async () => {
     if (audioRef.current && recordedAudioBlob) {
       if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
       } else {
-        audioRef.current.src = URL.createObjectURL(recordedAudioBlob);
-        audioRef.current.play();
-        setIsPlaying(true);
+        try {
+          audioRef.current.src = URL.createObjectURL(recordedAudioBlob);
+          await audioRef.current.play();
+          setIsPlaying(true);
+        } catch (error: any) {
+          console.error("Error playing audio:", error);
+          toast({
+            title: "Playback Error",
+            description: "Failed to play audio.",
+            variant: "destructive",
+          });
+          setIsPlaying(false);
+        }
       }
     }
   };
@@ -1275,18 +1308,45 @@ export default function RecordingTest() {
                 </Button>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Volume:</span>
-                  <span className="font-medium">{volume[0]}%</span>
-                </div>
+              <div className="space-y-4">
                 <Slider
-                  value={volume}
-                  onValueChange={setVolume}
-                  max={100}
-                  step={1}
-                  className="w-full"
+                  value={[currentTime]}
+                  max={duration || 100}
+                  step={0.1}
+                  onValueChange={(value) => {
+                    if (audioRef.current) {
+                      audioRef.current.currentTime = value[0];
+                      setCurrentTime(value[0]);
+                    }
+                  }}
+                  className="cursor-pointer"
                 />
+
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>{formatTime(currentTime)}</span>
+                  <span>{formatTime(duration)}</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Playback Speed:</span>
+                  <div className="flex gap-2">
+                    {[0.5, 1, 1.5, 2].map((rate) => (
+                      <Button
+                        key={rate}
+                        variant={playbackRate === rate ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setPlaybackRate(rate);
+                          if (audioRef.current) {
+                            audioRef.current.playbackRate = rate;
+                          }
+                        }}
+                      >
+                        {rate}x
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
