@@ -105,7 +105,7 @@ const ConferenceDetail = () => {
     try {
       const { data, error } = await supabase
         .from("sessions")
-        .select("*, tracks(conference_id)")
+        .select("*, tracks(conference_id), recording_url")
         .eq("tracks.conference_id", id)
         .order("start_time", { ascending: true });
 

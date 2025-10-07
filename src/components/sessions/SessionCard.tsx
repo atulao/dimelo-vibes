@@ -1,8 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Clock, MapPin, User, QrCode } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Edit, Trash2, Clock, MapPin, User, QrCode, Play, Pause } from "lucide-react";
 import { format, isBefore, isAfter } from "date-fns";
+import { useRef, useState, useEffect } from "react";
 
 interface Session {
   id: string;
@@ -13,6 +15,7 @@ interface Session {
   start_time: string | null;
   end_time: string | null;
   status: string;
+  recording_url?: string | null;
 }
 
 interface SessionCardProps {
@@ -23,6 +26,31 @@ interface SessionCardProps {
 }
 
 export const SessionCard = ({ session, onEdit, onDelete, onGenerateQR }: SessionCardProps) => {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleLoadedMetadata = () => setDuration(audio.duration);
+    const handleEnded = () => setIsPlaying(false);
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [session.recording_url]);
+
   const getStatus = () => {
     if (!session.start_time || !session.end_time) return session.status;
 
@@ -42,6 +70,42 @@ export const SessionCard = ({ session, onEdit, onDelete, onGenerateQR }: Session
     live: "bg-green-500",
     completed: "bg-gray-500",
     draft: "bg-yellow-500",
+  };
+
+  const togglePlayPause = async () => {
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      try {
+        await audioRef.current.play();
+        setIsPlaying(true);
+      } catch (error) {
+        console.error("Error playing audio:", error);
+      }
+    }
+  };
+
+  const handleSeek = (value: number[]) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = value[0];
+      setCurrentTime(value[0]);
+    }
+  };
+
+  const handlePlaybackRateChange = (rate: number) => {
+    setPlaybackRate(rate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = rate;
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -80,6 +144,51 @@ export const SessionCard = ({ session, onEdit, onDelete, onGenerateQR }: Session
               <span>{session.speaker_name}</span>
             </div>
           )}
+
+          {session.recording_url && (
+            <div className="space-y-3 pt-3 border-t">
+              <audio ref={audioRef} src={session.recording_url} preload="metadata" />
+              
+              <Slider
+                value={[currentTime]}
+                max={duration || 100}
+                step={0.1}
+                onValueChange={handleSeek}
+                className="w-full"
+              />
+              
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  onClick={togglePlayPause}
+                  variant="default"
+                  size="sm"
+                  className="flex-1"
+                >
+                  {isPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+                  {isPlaying ? "Pause" : "Play"}
+                </Button>
+                <div className="flex gap-1">
+                  {[0.5, 1, 1.5, 2].map((rate) => (
+                    <Button
+                      key={rate}
+                      onClick={() => handlePlaybackRateChange(rate)}
+                      variant={playbackRate === rate ? "default" : "outline"}
+                      size="sm"
+                      className="px-2"
+                    >
+                      {rate}x
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 pt-2">
             <Button
               variant="outline"
