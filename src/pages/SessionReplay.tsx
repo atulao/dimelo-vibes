@@ -372,15 +372,15 @@ export default function SessionReplay() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="flex items-center justify-between mb-6">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="self-start">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" className="flex-shrink-0">
                   <Share2 className="mr-2 h-4 w-4" />
                   Share
                 </Button>
@@ -444,9 +444,10 @@ export default function SessionReplay() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Button onClick={downloadTranscript}>
-              <Download className="mr-2 h-4 w-4" />
-              Download Transcript
+            <Button onClick={downloadTranscript} className="flex-shrink-0">
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Download Transcript</span>
+              <span className="sm:hidden">Download</span>
             </Button>
           </div>
         </div>
@@ -486,11 +487,11 @@ export default function SessionReplay() {
                   <span>{formatTime(duration)}</span>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <Button
                     size="lg"
                     onClick={togglePlayPause}
-                    className="w-32"
+                    className="w-full sm:w-32"
                   >
                     {isPlaying ? (
                       <Pause className="mr-2 h-5 w-5" />
@@ -500,13 +501,14 @@ export default function SessionReplay() {
                     {isPlaying ? "Pause" : "Play"}
                   </Button>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 justify-center flex-wrap">
                     {[0.5, 1, 1.5, 2].map((rate) => (
                       <Button
                         key={rate}
                         variant={playbackRate === rate ? "default" : "outline"}
                         size="sm"
                         onClick={() => handlePlaybackRateChange(rate)}
+                        className="flex-shrink-0"
                       >
                         {rate}x
                       </Button>
