@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare, FileDown, Upload } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare, FileDown, Upload, Save, QrCode } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,11 @@ import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { QRCodeDialog } from "@/components/sessions/QRCodeDialog";
+import { useNavigate } from "react-router-dom";
 
 interface TranscriptSegment {
   id: string;
@@ -48,6 +53,12 @@ export default function RecordingTest() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [rollingSummaries, setRollingSummaries] = useState<Array<{timestamp: string, summary: string}>>([]);
   const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showQRDialog, setShowQRDialog] = useState(false);
+  const [savedSession, setSavedSession] = useState<{ id: string; title: string } | null>(null);
+  const [sessionTitle, setSessionTitle] = useState("");
+  const [sessionDescription, setSessionDescription] = useState("");
   const summaryRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chunkIntervalRef = useRef<NodeJS.Timeout>();
@@ -55,6 +66,7 @@ export default function RecordingTest() {
   const accumulatedChunksRef = useRef<Blob[]>([]);
   
   const { toast } = useToast();
+  const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -125,6 +137,166 @@ export default function RecordingTest() {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleSaveSession = async () => {
+    if (!sessionTitle.trim()) {
+      toast({
+        title: "Title Required",
+        description: "Please enter a session title.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!recordedAudioBlob) {
+      toast({
+        title: "No Recording",
+        description: "Please record audio before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate("/auth");
+        throw new Error("You must be logged in to save sessions");
+      }
+
+      // Upload audio to storage
+      const fileName = `session-${Date.now()}.webm`;
+      const { error: uploadError } = await supabase.storage
+        .from('session-recordings')
+        .upload(fileName, recordedAudioBlob, {
+          contentType: 'audio/webm'
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('session-recordings')
+        .getPublicUrl(fileName);
+
+      // Find or create organization, conference, and track
+      let trackId = null;
+      
+      const { data: userOrgs } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('owner_id', user.id)
+        .limit(1)
+        .single();
+
+      let orgId = userOrgs?.id;
+
+      if (!orgId) {
+        const { data: newOrg } = await supabase
+          .from('organizations')
+          .insert({ name: 'My Organization', owner_id: user.id })
+          .select()
+          .single();
+        orgId = newOrg?.id;
+      }
+
+      if (orgId) {
+        const { data: conferences } = await supabase
+          .from('conferences')
+          .select('id')
+          .eq('organization_id', orgId)
+          .limit(1)
+          .single();
+
+        let confId = conferences?.id;
+
+        if (!confId) {
+          const { data: newConf } = await supabase
+            .from('conferences')
+            .insert({ name: 'My Conferences', organization_id: orgId })
+            .select()
+            .single();
+          confId = newConf?.id;
+        }
+
+        if (confId) {
+          const { data: tracks } = await supabase
+            .from('tracks')
+            .select('id')
+            .eq('conference_id', confId)
+            .limit(1)
+            .single();
+
+          trackId = tracks?.id;
+
+          if (!trackId) {
+            const { data: newTrack } = await supabase
+              .from('tracks')
+              .insert({ name: 'General', conference_id: confId })
+              .select()
+              .single();
+            trackId = newTrack?.id;
+          }
+        }
+      }
+
+      if (!trackId) throw new Error("Unable to create track");
+
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .insert({
+          title: sessionTitle,
+          description: sessionDescription || null,
+          recording_url: publicUrl,
+          track_id: trackId,
+          status: 'completed',
+          is_public: true,
+        })
+        .select()
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      if (transcriptSegments.length > 0) {
+        const segmentsToInsert = transcriptSegments.map(seg => ({
+          session_id: session.id,
+          text: seg.text,
+          speaker_label: 'Speaker',
+          start_time: seg.start || 0,
+          end_time: seg.end || 0,
+        }));
+
+        await supabase.from('transcript_segments').insert(segmentsToInsert);
+      }
+
+      if (aiSummary) {
+        await supabase.from('ai_insights').insert({
+          session_id: session.id,
+          insight_type: 'summary',
+          content: aiSummary,
+          confidence_score: 'high',
+        });
+      }
+
+      setSavedSession({ id: session.id, title: sessionTitle });
+      setShowSaveDialog(false);
+      setShowQRDialog(true);
+
+      toast({
+        title: "Session Saved!",
+        description: "Your session has been saved and is ready to share.",
+      });
+    } catch (error: any) {
+      console.error('Error saving session:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save session.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const setupAudioAnalyser = (stream: MediaStream) => {
