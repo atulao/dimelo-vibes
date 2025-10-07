@@ -46,8 +46,12 @@ export default function RecordingTest() {
   const [selectedLanguage, setSelectedLanguage] = useState("auto");
   const [averageConfidence, setAverageConfidence] = useState<number | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [rollingSummaries, setRollingSummaries] = useState<Array<{timestamp: string, summary: string}>>([]);
+  const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
   const summaryRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chunkIntervalRef = useRef<NodeJS.Timeout>();
+  const lastProcessedChunkRef = useRef<number>(0);
   
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -191,16 +195,31 @@ export default function RecordingTest() {
         if (audioContextRef.current) {
           audioContextRef.current.close();
         }
+        if (chunkIntervalRef.current) {
+          clearInterval(chunkIntervalRef.current);
+        }
       };
 
-      recorder.start();
+      // Start recording with 30-second chunks
+      recorder.start(30000);
       setMediaRecorder(recorder);
       setIsRecording(true);
+      setIsAutoAnalyzing(true);
       setAudioChunks(chunks);
+      lastProcessedChunkRef.current = 0;
+
+      // Set up interval to process chunks every 30 seconds
+      chunkIntervalRef.current = setInterval(() => {
+        if (chunks.length > lastProcessedChunkRef.current) {
+          const newChunks = chunks.slice(lastProcessedChunkRef.current);
+          lastProcessedChunkRef.current = chunks.length;
+          processAudioChunk(newChunks);
+        }
+      }, 30000);
 
       toast({
         title: "Recording Started",
-        description: "Speak into your microphone...",
+        description: "Auto-analysis enabled - summaries every 30 seconds",
       });
     } catch (error: any) {
       if (error.name === 'NotAllowedError') {
@@ -251,7 +270,12 @@ export default function RecordingTest() {
       setIsRecording(false);
       setIsPaused(false);
       setIsProcessing(true);
+      setIsAutoAnalyzing(false);
       setAudioLevel(0);
+      
+      if (chunkIntervalRef.current) {
+        clearInterval(chunkIntervalRef.current);
+      }
     }
   };
 
@@ -265,6 +289,11 @@ export default function RecordingTest() {
       setRecordedAudioBlob(null);
       setAudioLevel(0);
       setRecordingTime(0);
+      setIsAutoAnalyzing(false);
+      
+      if (chunkIntervalRef.current) {
+        clearInterval(chunkIntervalRef.current);
+      }
       
       toast({
         title: "Recording Cancelled",
@@ -612,9 +641,105 @@ export default function RecordingTest() {
     }
   };
 
+  const processAudioChunk = async (chunkBlobs: Blob[]) => {
+    try {
+      const chunkBlob = new Blob(chunkBlobs, { type: 'audio/webm' });
+      const reader = new FileReader();
+      
+      reader.onloadend = async () => {
+        const base64Audio = (reader.result as string).split(',')[1];
+        
+        console.log('Processing 30-second chunk...');
+        
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              audio: base64Audio,
+              sessionId: 'test-session-chunk',
+              language: selectedLanguage,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error('Chunk transcription failed');
+          return;
+        }
+
+        const data = await response.json();
+        
+        if (data.segments && data.segments.length > 0) {
+          const newSegments: TranscriptSegment[] = data.segments.map((seg: any, index: number) => ({
+            id: `${Date.now()}-${index}`,
+            text: seg.text,
+            timestamp: new Date(seg.start * 1000).toISOString().substr(14, 5),
+            confidence: seg.confidence,
+            start: seg.start,
+            end: seg.end,
+          }));
+          
+          setTranscriptSegments(prev => [...prev, ...newSegments]);
+          
+          // Generate rolling summary after adding new segments
+          await generateRollingSummary();
+        } else if (data.text) {
+          const newSegment: TranscriptSegment = {
+            id: Date.now().toString(),
+            text: data.text,
+            timestamp: new Date().toLocaleTimeString(),
+          };
+          
+          setTranscriptSegments(prev => [...prev, newSegment]);
+          
+          // Generate rolling summary after adding new segment
+          await generateRollingSummary();
+        }
+      };
+      
+      reader.readAsDataURL(chunkBlob);
+    } catch (error: any) {
+      console.error('Chunk processing error:', error);
+    }
+  };
+
+  const generateRollingSummary = async () => {
+    if (transcriptSegments.length === 0) return;
+
+    try {
+      const fullTranscript = transcriptSegments.map(s => s.text).join(' ');
+      
+      console.log('Generating rolling summary...');
+      
+      const { data, error } = await supabase.functions.invoke('generate-summary', {
+        body: { transcript: fullTranscript }
+      });
+
+      if (error) {
+        console.error('Rolling summary error:', error);
+        return;
+      }
+
+      if (data?.summary) {
+        const timestamp = new Date().toLocaleTimeString();
+        setRollingSummaries(prev => [...prev, { timestamp, summary: data.summary }]);
+        
+        console.log(`Rolling summary generated at ${timestamp}`);
+      }
+    } catch (error) {
+      console.error('Error generating rolling summary:', error);
+    }
+  };
+
   const clearTranscript = () => {
     setTranscriptSegments([]);
     setAverageConfidence(null);
+    setRollingSummaries([]);
     toast({
       title: "Transcript Cleared",
     });
@@ -830,6 +955,26 @@ export default function RecordingTest() {
                     <X className="h-5 w-5" />
                     Cancel
                   </Button>
+                  {rollingSummaries.length > 0 && (
+                    <Button
+                      onClick={() => {
+                        const element = document.getElementById('rolling-summaries');
+                        if (element) {
+                          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          toast({
+                            title: "Latest Summary",
+                            description: `Last updated at ${rollingSummaries[rollingSummaries.length - 1].timestamp}`,
+                          });
+                        }
+                      }}
+                      size="lg"
+                      variant="secondary"
+                      className="flex items-center gap-2"
+                    >
+                      <Sparkles className="h-5 w-5" />
+                      Catch Me Up
+                    </Button>
+                  )}
                   <Badge variant={isPaused ? "secondary" : "destructive"} className={isPaused ? "" : "animate-pulse"}>
                     <div className="w-2 h-2 rounded-full bg-white mr-2" />
                     {formatTime(recordingTime)} {isPaused && "(Paused)"}
@@ -907,6 +1052,50 @@ export default function RecordingTest() {
                   step={1}
                   className="w-full"
                 />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Rolling Summaries - Shows real-time summaries during recording */}
+        {rollingSummaries.length > 0 && (
+          <Card id="rolling-summaries">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle>Real-Time Analysis</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Auto-generated summaries every 30 seconds</p>
+              </div>
+              {isAutoAnalyzing && (
+                <Badge variant="secondary" className="animate-pulse">
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  Analyzing
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[...rollingSummaries].reverse().map((item, index) => (
+                  <div 
+                    key={index} 
+                    className={`p-4 rounded-lg border ${
+                      index === 0 
+                        ? 'bg-primary/5 border-primary' 
+                        : 'bg-muted/30 border-border'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant={index === 0 ? "default" : "outline"} className="text-xs">
+                        {index === 0 ? 'Latest' : item.timestamp}
+                      </Badge>
+                      {index === 0 && (
+                        <span className="text-xs text-muted-foreground">{item.timestamp}</span>
+                      )}
+                    </div>
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <div className="whitespace-pre-wrap text-sm">{item.summary}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
