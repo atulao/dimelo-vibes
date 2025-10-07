@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -244,6 +244,24 @@ export default function RecordingTest() {
       setIsPaused(false);
       setIsProcessing(true);
       setAudioLevel(0);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorder && isRecording) {
+      // Stop the recorder without processing
+      mediaRecorder.stop();
+      setIsRecording(false);
+      setIsPaused(false);
+      setAudioChunks([]);
+      setRecordedAudioBlob(null);
+      setAudioLevel(0);
+      setRecordingTime(0);
+      
+      toast({
+        title: "Recording Cancelled",
+        description: "Recording discarded without processing",
+      });
     }
   };
 
@@ -576,6 +594,15 @@ export default function RecordingTest() {
                   >
                     <Square className="h-5 w-5" />
                     Stop Recording
+                  </Button>
+                  <Button
+                    onClick={cancelRecording}
+                    size="lg"
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <X className="h-5 w-5" />
+                    Cancel
                   </Button>
                   <Badge variant={isPaused ? "secondary" : "destructive"} className={isPaused ? "" : "animate-pulse"}>
                     <div className="w-2 h-2 rounded-full bg-white mr-2" />
