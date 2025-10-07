@@ -172,18 +172,26 @@ export default function RecordingTest() {
       setupAudioAnalyser(stream);
       
       const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      const chunks: Blob[] = [];
+      const allChunks: Blob[] = [];
       
-      recorder.ondataavailable = (e) => {
+      recorder.ondataavailable = async (e) => {
         if (e.data.size > 0) {
-          chunks.push(e.data);
+          allChunks.push(e.data);
+          
+          // Process this chunk immediately for transcription
+          // Only process if we're still recording (not the final stop chunk)
+          if (recorder.state === 'recording' || recorder.state === 'paused') {
+            console.log('Processing 30-second chunk...');
+            await processAudioChunk([e.data]);
+          }
         }
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        const audioBlob = new Blob(allChunks, { type: 'audio/webm' });
         setRecordedAudioBlob(audioBlob);
-        await processAudio(audioBlob);
+        // Don't process the full audio again since we've been processing chunks
+        setIsProcessing(false);
         
         // Cleanup
         if (streamRef.current) {
@@ -200,20 +208,17 @@ export default function RecordingTest() {
         }
       };
 
-      // Start recording with 30-second chunks
-      recorder.start(30000);
+      // Start recording - request data every 30 seconds
+      recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
       setIsAutoAnalyzing(true);
-      setAudioChunks(chunks);
-      lastProcessedChunkRef.current = 0;
+      setAudioChunks(allChunks);
 
-      // Set up interval to process chunks every 30 seconds
+      // Set up interval to request data every 30 seconds
       chunkIntervalRef.current = setInterval(() => {
-        if (chunks.length > lastProcessedChunkRef.current) {
-          const newChunks = chunks.slice(lastProcessedChunkRef.current);
-          lastProcessedChunkRef.current = chunks.length;
-          processAudioChunk(newChunks);
+        if (recorder.state === 'recording') {
+          recorder.requestData();
         }
       }, 30000);
 
@@ -686,62 +691,71 @@ export default function RecordingTest() {
   const processAudioChunk = async (chunkBlobs: Blob[]) => {
     try {
       const chunkBlob = new Blob(chunkBlobs, { type: 'audio/webm' });
-      const reader = new FileReader();
       
+      const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64Audio = (reader.result as string).split(',')[1];
-        
-        console.log('Processing 30-second chunk...');
-        
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify({
-              audio: base64Audio,
-              sessionId: 'test-session-chunk',
-              language: selectedLanguage,
-            }),
+        try {
+          const base64Audio = (reader.result as string).split(',')[1];
+          
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+              body: JSON.stringify({
+                audio: base64Audio,
+                sessionId: 'test-session-chunk',
+                language: selectedLanguage === 'auto' ? undefined : selectedLanguage,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Chunk transcription failed:', response.status, errorText);
+            return;
           }
-        );
 
-        if (!response.ok) {
-          console.error('Chunk transcription failed');
-          return;
+          const data = await response.json();
+          
+          if (data.segments && data.segments.length > 0) {
+            const newSegments: TranscriptSegment[] = data.segments.map((seg: any, index: number) => ({
+              id: `${Date.now()}-${index}-${Math.random()}`,
+              text: seg.text,
+              timestamp: new Date(seg.start * 1000).toISOString().substr(14, 5),
+              confidence: seg.confidence,
+              start: seg.start,
+              end: seg.end,
+            }));
+            
+            setTranscriptSegments(prev => [...prev, ...newSegments]);
+            console.log(`Added ${newSegments.length} transcript segments from chunk`);
+            
+            // Generate rolling summary after adding new segments
+            await generateRollingSummary();
+          } else if (data.text) {
+            const newSegment: TranscriptSegment = {
+              id: `${Date.now()}-${Math.random()}`,
+              text: data.text,
+              timestamp: new Date().toLocaleTimeString(),
+            };
+            
+            setTranscriptSegments(prev => [...prev, newSegment]);
+            console.log('Added transcript segment from chunk');
+            
+            // Generate rolling summary after adding new segment
+            await generateRollingSummary();
+          }
+        } catch (err) {
+          console.error('Error in chunk processing:', err);
         }
-
-        const data = await response.json();
-        
-        if (data.segments && data.segments.length > 0) {
-          const newSegments: TranscriptSegment[] = data.segments.map((seg: any, index: number) => ({
-            id: `${Date.now()}-${index}`,
-            text: seg.text,
-            timestamp: new Date(seg.start * 1000).toISOString().substr(14, 5),
-            confidence: seg.confidence,
-            start: seg.start,
-            end: seg.end,
-          }));
-          
-          setTranscriptSegments(prev => [...prev, ...newSegments]);
-          
-          // Generate rolling summary after adding new segments
-          await generateRollingSummary();
-        } else if (data.text) {
-          const newSegment: TranscriptSegment = {
-            id: Date.now().toString(),
-            text: data.text,
-            timestamp: new Date().toLocaleTimeString(),
-          };
-          
-          setTranscriptSegments(prev => [...prev, newSegment]);
-          
-          // Generate rolling summary after adding new segment
-          await generateRollingSummary();
-        }
+      };
+      
+      reader.onerror = (error) => {
+        console.error('FileReader error:', error);
       };
       
       reader.readAsDataURL(chunkBlob);
