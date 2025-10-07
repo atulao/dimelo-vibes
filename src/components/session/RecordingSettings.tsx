@@ -182,12 +182,10 @@ export const RecordingSettings = ({ sessionId }: RecordingSettingsProps) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="browser">
-                Browser (Free)
-                <Badge variant="outline" className="ml-2">Chrome/Edge</Badge>
+                Browser (Free - Chrome/Edge)
               </SelectItem>
               <SelectItem value="whisper">
-                OpenAI Whisper (Premium)
-                <Badge variant="outline" className="ml-2">Higher Accuracy</Badge>
+                OpenAI Whisper (Premium - Higher Accuracy)
               </SelectItem>
             </SelectContent>
           </Select>
