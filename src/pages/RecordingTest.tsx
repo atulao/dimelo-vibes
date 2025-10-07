@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
 
 interface TranscriptSegment {
   id: string;
@@ -25,6 +26,9 @@ export default function RecordingTest() {
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [qaQuestion, setQaQuestion] = useState("");
+  const [qaConversation, setQaConversation] = useState<Array<{role: string, content: string}>>([]);
+  const [isAskingQuestion, setIsAskingQuestion] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null);
@@ -301,6 +305,48 @@ export default function RecordingTest() {
       });
     } finally {
       setIsGeneratingSummary(false);
+    }
+  };
+
+  const askQuestion = async () => {
+    if (!qaQuestion.trim() || transcriptSegments.length === 0) {
+      return;
+    }
+
+    const fullTranscript = transcriptSegments.map(s => s.text).join(' ');
+    const currentQuestion = qaQuestion.trim();
+    
+    // Add user question to conversation
+    setQaConversation(prev => [...prev, { role: "user", content: currentQuestion }]);
+    setQaQuestion("");
+    setIsAskingQuestion(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('transcript-qa', {
+        body: { 
+          transcript: fullTranscript,
+          question: currentQuestion,
+          conversationHistory: qaConversation
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.answer) {
+        // Add AI answer to conversation
+        setQaConversation(prev => [...prev, { role: "assistant", content: data.answer }]);
+      }
+    } catch (error) {
+      console.error('Error asking question:', error);
+      toast({
+        title: "Failed to get answer",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive"
+      });
+      // Remove the user question if we failed to get an answer
+      setQaConversation(prev => prev.slice(0, -1));
+    } finally {
+      setIsAskingQuestion(false);
     }
   };
 
@@ -711,11 +757,65 @@ export default function RecordingTest() {
             </CardHeader>
             <CardContent>
               {aiSummary ? (
-                <div className="p-4 border rounded-lg bg-muted/50">
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {aiSummary}
-                    </p>
+                <div className="space-y-4">
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {aiSummary}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Q&A Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Ask a question about the transcript..."
+                        value={qaQuestion}
+                        onChange={(e) => setQaQuestion(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            askQuestion();
+                          }
+                        }}
+                        disabled={isAskingQuestion}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={askQuestion}
+                        disabled={isAskingQuestion || !qaQuestion.trim()}
+                        size="sm"
+                      >
+                        {isAskingQuestion ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+
+                    {qaConversation.length > 0 && (
+                      <div className="space-y-3 mt-4">
+                        {qaConversation.map((msg, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-lg ${
+                              msg.role === 'user'
+                                ? 'bg-primary/10 ml-8'
+                                : 'bg-muted/50 mr-8'
+                            }`}
+                          >
+                            <p className="text-xs font-semibold mb-1 text-muted-foreground">
+                              {msg.role === 'user' ? 'You' : 'AI'}
+                            </p>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                              {msg.content}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
