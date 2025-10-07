@@ -448,28 +448,70 @@ export default function RecordingTest() {
     setIsProcessing(true);
 
     try {
-      // Read file as array buffer
-      const arrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
+      console.log(`Processing file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       
-      // Convert to base64
-      let binary = '';
-      const len = bytes.byteLength;
-      for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64Audio = btoa(binary);
+      let data, error;
+      
+      // For files larger than 10MB, upload to storage first
+      if (file.size > 10 * 1024 * 1024) {
+        console.log('Large file detected, uploading to storage first...');
+        
+        // Upload to Supabase Storage
+        const fileName = `temp-upload-${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('session-recordings')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
-      console.log(`Uploading file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        if (uploadError) throw uploadError;
 
-      // Send to transcription API
-      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-        body: { 
-          audio: base64Audio,
-          sessionId: 'upload-session',
-          language: selectedLanguage === 'auto' ? undefined : selectedLanguage
+        console.log('File uploaded to storage, processing...');
+
+        // Send storage path to transcription API
+        const response = await supabase.functions.invoke('transcribe-audio', {
+          body: { 
+            storagePath: fileName,
+            sessionId: 'upload-session',
+            language: selectedLanguage === 'auto' ? undefined : selectedLanguage
+          }
+        });
+
+        data = response.data;
+        error = response.error;
+
+        // Clean up the temporary file
+        await supabase.storage
+          .from('session-recordings')
+          .remove([fileName]);
+          
+      } else {
+        // For smaller files, use base64 approach
+        console.log('Small file, using direct upload...');
+        
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        
+        // Convert to base64
+        let binary = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
         }
-      });
+        const base64Audio = btoa(binary);
+
+        const response = await supabase.functions.invoke('transcribe-audio', {
+          body: { 
+            audio: base64Audio,
+            sessionId: 'upload-session',
+            language: selectedLanguage === 'auto' ? undefined : selectedLanguage
+          }
+        });
+
+        data = response.data;
+        error = response.error;
+      }
 
       if (error) throw error;
 

@@ -42,10 +42,10 @@ serve(async (req) => {
   }
 
   try {
-    const { audio, sessionId, language = 'auto' } = await req.json();
+    const { audio, storagePath, sessionId, language = 'auto' } = await req.json();
     
-    if (!audio) {
-      throw new Error('No audio data provided');
+    if (!audio && !storagePath) {
+      throw new Error('No audio data or storage path provided');
     }
 
     if (!sessionId) {
@@ -59,12 +59,42 @@ serve(async (req) => {
 
     console.log(`Processing audio for session ${sessionId}`);
 
-    // Process audio in chunks
-    const binaryAudio = processBase64Chunks(audio);
+    let binaryAudio: Uint8Array;
+
+    if (storagePath) {
+      // Download from Supabase Storage for large files
+      console.log(`Downloading from storage: ${storagePath}`);
+      
+      const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+      const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error('Supabase configuration missing');
+      }
+
+      const storageUrl = `${SUPABASE_URL}/storage/v1/object/session-recordings/${storagePath}`;
+      const storageResponse = await fetch(storageUrl, {
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        }
+      });
+
+      if (!storageResponse.ok) {
+        throw new Error(`Failed to download from storage: ${storageResponse.statusText}`);
+      }
+
+      const arrayBuffer = await storageResponse.arrayBuffer();
+      binaryAudio = new Uint8Array(arrayBuffer);
+      console.log(`Downloaded ${binaryAudio.length} bytes from storage`);
+    } else {
+      // Process base64 audio in chunks for smaller files
+      console.log('Processing base64 audio...');
+      binaryAudio = processBase64Chunks(audio);
+    }
     
     // Prepare form data for OpenAI Whisper
     const formData = new FormData();
-    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
+    const blob = new Blob([binaryAudio as unknown as BlobPart], { type: 'audio/webm' });
     formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'verbose_json'); // Get detailed output with timestamps
