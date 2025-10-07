@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -757,71 +757,79 @@ export default function RecordingTest() {
             </CardHeader>
             <CardContent>
               {aiSummary ? (
-                <div className="space-y-4">
-                  <div className="p-4 border rounded-lg bg-muted/50">
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                        {aiSummary}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Q&A Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="Ask a question about the transcript..."
-                        value={qaQuestion}
-                        onChange={(e) => setQaQuestion(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            askQuestion();
-                          }
-                        }}
-                        disabled={isAskingQuestion}
-                        className="flex-1"
-                      />
-                      <Button
-                        onClick={askQuestion}
-                        disabled={isAskingQuestion || !qaQuestion.trim()}
-                        size="sm"
-                      >
-                        {isAskingQuestion ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-
-                    {qaConversation.length > 0 && (
-                      <div className="space-y-3 mt-4">
-                        {qaConversation.map((msg, idx) => (
-                          <div
-                            key={idx}
-                            className={`p-3 rounded-lg ${
-                              msg.role === 'user'
-                                ? 'bg-primary/10 ml-8'
-                                : 'bg-muted/50 mr-8'
-                            }`}
-                          >
-                            <p className="text-xs font-semibold mb-1 text-muted-foreground">
-                              {msg.role === 'user' ? 'You' : 'AI'}
-                            </p>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                              {msg.content}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                <div className="p-4 border rounded-lg bg-muted/50">
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {aiSummary}
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div className="p-8 text-center text-muted-foreground">
                   <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>Click "Generate Summary" to create a comprehensive AI-powered summary of your transcript</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Q&A Section - Available whenever transcript exists */}
+        {transcriptSegments.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Ask Questions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Ask a question about the transcript..."
+                  value={qaQuestion}
+                  onChange={(e) => setQaQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      askQuestion();
+                    }
+                  }}
+                  disabled={isAskingQuestion}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={askQuestion}
+                  disabled={isAskingQuestion || !qaQuestion.trim()}
+                  size="sm"
+                >
+                  {isAskingQuestion ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+
+              {qaConversation.length > 0 && (
+                <div className="space-y-3">
+                  {qaConversation.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-lg ${
+                        msg.role === 'user'
+                          ? 'bg-primary/10 ml-8'
+                          : 'bg-muted/50 mr-8'
+                      }`}
+                    >
+                      <p className="text-xs font-semibold mb-1 text-muted-foreground">
+                        {msg.role === 'user' ? 'You' : 'AI'}
+                      </p>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {msg.content}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
