@@ -59,6 +59,8 @@ export default function RecordingTest() {
   const [savedSession, setSavedSession] = useState<{ id: string; title: string } | null>(null);
   const [sessionTitle, setSessionTitle] = useState("");
   const [sessionDescription, setSessionDescription] = useState("");
+  const [conferences, setConferences] = useState<Array<{ id: string; name: string; tracks: Array<{ id: string; name: string }> }>>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState<string>("");
   const summaryRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chunkIntervalRef = useRef<NodeJS.Timeout>();
@@ -139,11 +141,50 @@ export default function RecordingTest() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Fetch available conferences and tracks
+  useEffect(() => {
+    const fetchConferencesAndTracks = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: conferencesData } = await supabase
+        .from('conferences')
+        .select(`
+          id,
+          name,
+          tracks (
+            id,
+            name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (conferencesData) {
+        setConferences(conferencesData as any);
+        // Auto-select first track if available
+        if (conferencesData.length > 0 && conferencesData[0].tracks?.length > 0) {
+          setSelectedTrackId(conferencesData[0].tracks[0].id);
+        }
+      }
+    };
+
+    fetchConferencesAndTracks();
+  }, []);
+
   const handleSaveSession = async () => {
     if (!sessionTitle.trim()) {
       toast({
         title: "Title Required",
         description: "Please enter a session title.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedTrackId) {
+      toast({
+        title: "Track Required",
+        description: "Please select a conference track.",
         variant: "destructive",
       });
       return;
@@ -180,76 +221,13 @@ export default function RecordingTest() {
         .from('session-recordings')
         .getPublicUrl(fileName);
 
-      // Find or create organization, conference, and track
-      let trackId = null;
-      
-      const { data: userOrgs } = await supabase
-        .from('organizations')
-        .select('id')
-        .eq('owner_id', user.id)
-        .limit(1)
-        .single();
-
-      let orgId = userOrgs?.id;
-
-      if (!orgId) {
-        const { data: newOrg } = await supabase
-          .from('organizations')
-          .insert({ name: 'My Organization', owner_id: user.id })
-          .select()
-          .single();
-        orgId = newOrg?.id;
-      }
-
-      if (orgId) {
-        const { data: conferences } = await supabase
-          .from('conferences')
-          .select('id')
-          .eq('organization_id', orgId)
-          .limit(1)
-          .single();
-
-        let confId = conferences?.id;
-
-        if (!confId) {
-          const { data: newConf } = await supabase
-            .from('conferences')
-            .insert({ name: 'My Conferences', organization_id: orgId })
-            .select()
-            .single();
-          confId = newConf?.id;
-        }
-
-        if (confId) {
-          const { data: tracks } = await supabase
-            .from('tracks')
-            .select('id')
-            .eq('conference_id', confId)
-            .limit(1)
-            .single();
-
-          trackId = tracks?.id;
-
-          if (!trackId) {
-            const { data: newTrack } = await supabase
-              .from('tracks')
-              .insert({ name: 'General', conference_id: confId })
-              .select()
-              .single();
-            trackId = newTrack?.id;
-          }
-        }
-      }
-
-      if (!trackId) throw new Error("Unable to create track");
-
       const { data: session, error: sessionError } = await supabase
         .from('sessions')
         .insert({
           title: sessionTitle,
           description: sessionDescription || null,
           recording_url: publicUrl,
-          track_id: trackId,
+          track_id: selectedTrackId,
           status: 'completed',
           is_public: true,
         })
@@ -1653,6 +1631,33 @@ export default function RecordingTest() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="track">Conference Track *</Label>
+              <Select value={selectedTrackId} onValueChange={setSelectedTrackId}>
+                <SelectTrigger id="track">
+                  <SelectValue placeholder="Select a conference track" />
+                </SelectTrigger>
+                <SelectContent>
+                  {conferences.map((conference) => (
+                    <div key={conference.id}>
+                      <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                        {conference.name}
+                      </div>
+                      {conference.tracks?.map((track) => (
+                        <SelectItem key={track.id} value={track.id}>
+                          {track.name}
+                        </SelectItem>
+                      ))}
+                    </div>
+                  ))}
+                  {conferences.length === 0 && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      No conferences available. Create one first.
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="description">Description (Optional)</Label>
               <Textarea
                 id="description"
@@ -1688,7 +1693,7 @@ export default function RecordingTest() {
               <Button
                 onClick={handleSaveSession}
                 className="flex-1"
-                disabled={isSaving || !sessionTitle.trim()}
+                disabled={isSaving || !sessionTitle.trim() || !selectedTrackId}
               >
                 {isSaving ? (
                   <>
