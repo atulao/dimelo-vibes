@@ -434,11 +434,11 @@ export default function RecordingTest() {
       return;
     }
 
-    // Validate file size (max 25MB for Whisper API)
-    if (file.size > 25 * 1024 * 1024) {
+    // Validate file size (max 100MB)
+    if (file.size > 100 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Maximum file size is 25MB",
+        description: "Maximum file size is 100MB",
         variant: "destructive"
       });
       return;
