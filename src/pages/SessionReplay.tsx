@@ -126,7 +126,7 @@ export default function SessionReplay() {
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("canplay", handleCanPlay);
     };
-  }, [segments]);
+  }, [session?.recording_url, segments]);
 
   const fetchSessionData = async () => {
     try {
