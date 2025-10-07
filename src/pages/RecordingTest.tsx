@@ -761,24 +761,35 @@ export default function RecordingTest() {
   };
 
   const playAudio = async () => {
-    if (audioRef.current && recordedAudioBlob) {
-      if (isPlaying) {
-        audioRef.current.pause();
+    if (!audioRef.current || !recordedAudioBlob) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      try {
+        // Create a new blob URL each time we play
+        const blobUrl = URL.createObjectURL(recordedAudioBlob);
+        audioRef.current.src = blobUrl;
+        
+        // Wait for audio to load before playing
+        audioRef.current.load();
+        
+        await audioRef.current.play();
+        setIsPlaying(true);
+        
+        toast({
+          title: "Playing Recording",
+          description: `Duration: ${formatTime(duration)}`,
+        });
+      } catch (error: any) {
+        console.error("Error playing audio:", error);
+        toast({
+          title: "Playback Error",
+          description: error.message || "Failed to play audio.",
+          variant: "destructive",
+        });
         setIsPlaying(false);
-      } else {
-        try {
-          audioRef.current.src = URL.createObjectURL(recordedAudioBlob);
-          await audioRef.current.play();
-          setIsPlaying(true);
-        } catch (error: any) {
-          console.error("Error playing audio:", error);
-          toast({
-            title: "Playback Error",
-            description: "Failed to play audio.",
-            variant: "destructive",
-          });
-          setIsPlaying(false);
-        }
       }
     }
   };
