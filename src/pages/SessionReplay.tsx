@@ -92,20 +92,39 @@ export default function SessionReplay() {
 
     const handleLoadedMetadata = () => {
       setDuration(audio.duration);
+      console.log("Audio loaded, duration:", audio.duration);
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
     };
 
+    const handleError = (e: Event) => {
+      console.error("Audio error:", e);
+      toast({
+        title: "Audio Error",
+        description: "Failed to load audio recording.",
+        variant: "destructive",
+      });
+      setIsPlaying(false);
+    };
+
+    const handleCanPlay = () => {
+      console.log("Audio can play, ready state:", audio.readyState);
+    };
+
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("canplay", handleCanPlay);
 
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("canplay", handleCanPlay);
     };
   }, [segments]);
 
@@ -167,23 +186,38 @@ export default function SessionReplay() {
     setActiveSegmentId(segment?.id || null);
   };
 
-  const togglePlayPause = () => {
+  const togglePlayPause = async () => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
-        audioRef.current.play();
+        try {
+          await audioRef.current.play();
+          setIsPlaying(true);
+        } catch (error: any) {
+          console.error("Error playing audio:", error);
+          toast({
+            title: "Playback Error",
+            description: "Failed to play audio. The recording may not be available.",
+            variant: "destructive",
+          });
+          setIsPlaying(false);
+        }
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
-  const handleSegmentClick = (startTime: number) => {
+  const handleSegmentClick = async (startTime: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime = startTime;
       if (!isPlaying) {
-        audioRef.current.play();
-        setIsPlaying(true);
+        try {
+          await audioRef.current.play();
+          setIsPlaying(true);
+        } catch (error) {
+          console.error("Error playing audio:", error);
+        }
       }
     }
   };
