@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare } from "lucide-react";
+import { Mic, Square, Loader2, Play, Pause, Download, Volume2, AlertTriangle, Sparkles, X, Send, MessageSquare, FileDown } from "lucide-react";
+import html2pdf from "html2pdf.js";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -44,6 +45,7 @@ export default function RecordingTest() {
   const [isBrowserSupported, setIsBrowserSupported] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState("auto");
   const [averageConfidence, setAverageConfidence] = useState<number | null>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -305,6 +307,42 @@ export default function RecordingTest() {
       });
     } finally {
       setIsGeneratingSummary(false);
+    }
+  };
+
+  const downloadSummaryPDF = async () => {
+    if (!aiSummary || !summaryRef.current) {
+      toast({
+        title: "No summary to download",
+        description: "Please generate a summary first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const element = summaryRef.current;
+      const opt = {
+        margin: [15, 15, 15, 15] as [number, number, number, number],
+        filename: `session-summary-${new Date().toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+      
+      toast({
+        title: "PDF Downloaded",
+        description: "Summary has been saved as a PDF",
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Failed to download PDF",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive"
+      });
     }
   };
 
@@ -736,29 +774,44 @@ export default function RecordingTest() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle>AI Summary</CardTitle>
-              <Button 
-                onClick={generateSummary}
-                disabled={isGeneratingSummary}
-                variant="outline"
-                size="sm"
-              >
-                {isGeneratingSummary ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate Summary
-                  </>
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={generateSummary}
+                  disabled={isGeneratingSummary}
+                  variant="outline"
+                  size="sm"
+                >
+                  {isGeneratingSummary ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Generate Summary
+                    </>
+                  )}
+                </Button>
+                {aiSummary && (
+                  <Button 
+                    onClick={downloadSummaryPDF}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Download PDF
+                  </Button>
                 )}
-              </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {aiSummary ? (
                 <div className="bg-background shadow-lg rounded-lg overflow-hidden">
-                  <div className="p-8 md:p-12 max-h-[600px] overflow-y-auto">
+                  <div 
+                    ref={summaryRef}
+                    className="p-8 md:p-12 max-h-[600px] overflow-y-auto"
+                  >
                     <div className="prose prose-slate dark:prose-invert max-w-none
                       prose-headings:font-bold prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-0
                       prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:border-b prose-h2:pb-2
