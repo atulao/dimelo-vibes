@@ -35,21 +35,44 @@ export const SessionCard = ({ session, onEdit, onDelete, onGenerateQR }: Session
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    if (!session.recording_url) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const handleLoadedMetadata = () => setDuration(audio.duration);
+    console.log('Setting up audio listeners for:', session.title);
+
+    const handleTimeUpdate = () => {
+      console.log('Time update:', audio.currentTime);
+      setCurrentTime(audio.currentTime);
+    };
+    
+    const handleLoadedMetadata = () => {
+      console.log('Metadata loaded, duration:', audio.duration);
+      setDuration(audio.duration);
+    };
+    
     const handleEnded = () => setIsPlaying(false);
+
+    const handleError = (e: Event) => {
+      console.error('Audio error for', session.title, e);
+    };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+
+    // If metadata is already loaded, set duration immediately
+    if (audio.readyState >= 1) {
+      console.log('Metadata already loaded:', audio.duration);
+      setDuration(audio.duration);
+    }
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
     };
-  }, [session.recording_url]);
+  }, [session.recording_url, session.title]);
 
   const getStatus = () => {
     if (!session.start_time || !session.end_time) return session.status;
