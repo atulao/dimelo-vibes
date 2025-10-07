@@ -16,6 +16,8 @@ import {
   Unlock,
   Copy,
   MessageSquare,
+  Send,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -28,7 +30,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { QASection } from "@/components/session/QASection";
+import { Input } from "@/components/ui/input";
 
 interface TranscriptSegment {
   id: string;
@@ -69,6 +71,9 @@ export default function SessionReplay() {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [qaQuestion, setQaQuestion] = useState("");
+  const [qaConversation, setQaConversation] = useState<Array<{role: string, content: string}>>([]);
+  const [isAskingQuestion, setIsAskingQuestion] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -261,6 +266,47 @@ export default function SessionReplay() {
       title: "Copied",
       description: "Embed code copied to clipboard.",
     });
+  };
+
+  const askQuestion = async () => {
+    if (!qaQuestion.trim() || segments.length === 0) {
+      return;
+    }
+
+    const fullTranscript = segments.map(s => s.text).join(' ');
+    const currentQuestion = qaQuestion.trim();
+    
+    // Add user question to conversation
+    setQaConversation(prev => [...prev, { role: "user", content: currentQuestion }]);
+    setQaQuestion("");
+    setIsAskingQuestion(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('transcript-qa', {
+        body: { 
+          transcript: fullTranscript,
+          question: currentQuestion,
+          conversationHistory: qaConversation
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.answer) {
+        // Add AI answer to conversation
+        setQaConversation(prev => [...prev, { role: "assistant", content: data.answer }]);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Failed to get answer",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive"
+      });
+      // Remove the user question if we failed to get an answer
+      setQaConversation(prev => prev.slice(0, -1));
+    } finally {
+      setIsAskingQuestion(false);
+    }
   };
 
   if (loading) {
@@ -459,7 +505,62 @@ export default function SessionReplay() {
           </div>
 
           <div className="space-y-6">
-            <QASection sessionId={id || ""} />
+            <Card className="p-6">
+              <h2 className="text-xl font-semibold flex items-center gap-2 mb-4">
+                <MessageSquare className="h-5 w-5" />
+                Ask Questions
+              </h2>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Ask a question about the transcript..."
+                    value={qaQuestion}
+                    onChange={(e) => setQaQuestion(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        askQuestion();
+                      }
+                    }}
+                    disabled={isAskingQuestion}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={askQuestion}
+                    disabled={isAskingQuestion || !qaQuestion.trim()}
+                    size="sm"
+                  >
+                    {isAskingQuestion ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+
+                {qaConversation.length > 0 && (
+                  <div className="space-y-3">
+                    {[...qaConversation].reverse().map((msg, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-lg ${
+                          msg.role === 'user'
+                            ? 'bg-primary/10 ml-8'
+                            : 'bg-muted/50 mr-8'
+                        }`}
+                      >
+                        <p className="text-xs font-semibold mb-1 text-muted-foreground">
+                          {msg.role === 'user' ? 'You' : 'AI'}
+                        </p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {msg.content}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
         </div>
       </div>
