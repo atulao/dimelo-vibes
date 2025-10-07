@@ -173,17 +173,11 @@ export default function RecordingTest() {
       
       const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       const allChunks: Blob[] = [];
+      let lastTranscribedDuration = 0; // Track what we've already transcribed
       
-      recorder.ondataavailable = async (e) => {
+      recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           allChunks.push(e.data);
-          
-          // Process this chunk immediately for transcription
-          // Only process if we're still recording (not the final stop chunk)
-          if (recorder.state === 'recording' || recorder.state === 'paused') {
-            console.log('Processing 30-second chunk...');
-            await processAudioChunk([e.data]);
-          }
         }
       };
 
@@ -208,17 +202,21 @@ export default function RecordingTest() {
         }
       };
 
-      // Start recording - request data every 30 seconds
+      // Start recording
       recorder.start();
       setMediaRecorder(recorder);
       setIsRecording(true);
       setIsAutoAnalyzing(true);
       setAudioChunks(allChunks);
 
-      // Set up interval to request data every 30 seconds
-      chunkIntervalRef.current = setInterval(() => {
-        if (recorder.state === 'recording') {
-          recorder.requestData();
+      // Set up interval to transcribe accumulated audio every 30 seconds
+      chunkIntervalRef.current = setInterval(async () => {
+        if (recorder.state === 'recording' && allChunks.length > 0) {
+          console.log('Processing accumulated audio...');
+          // Create a blob from all chunks accumulated so far
+          const fullBlob = new Blob(allChunks, { type: 'audio/webm' });
+          await processAccumulatedAudio(fullBlob, lastTranscribedDuration);
+          lastTranscribedDuration = 30 * Math.floor(allChunks.length / 1); // Rough estimate
         }
       }, 30000);
 
@@ -235,7 +233,7 @@ export default function RecordingTest() {
         });
       } else if (error.name === 'NotFoundError') {
         toast({
-          title: "No Microphone Found",
+        title: "No Microphone Found",
           description: "Please connect a microphone and try again.",
           variant: "destructive",
         });
@@ -688,10 +686,8 @@ export default function RecordingTest() {
     }
   };
 
-  const processAudioChunk = async (chunkBlobs: Blob[]) => {
+  const processAccumulatedAudio = async (audioBlob: Blob, lastDuration: number) => {
     try {
-      const chunkBlob = new Blob(chunkBlobs, { type: 'audio/webm' });
-      
       const reader = new FileReader();
       reader.onloadend = async () => {
         try {
@@ -707,7 +703,7 @@ export default function RecordingTest() {
               },
               body: JSON.stringify({
                 audio: base64Audio,
-                sessionId: 'test-session-chunk',
+                sessionId: 'test-session-incremental',
                 language: selectedLanguage === 'auto' ? undefined : selectedLanguage,
               }),
             }
@@ -715,27 +711,32 @@ export default function RecordingTest() {
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error('Chunk transcription failed:', response.status, errorText);
+            console.error('Incremental transcription failed:', response.status, errorText);
             return;
           }
 
           const data = await response.json();
           
           if (data.segments && data.segments.length > 0) {
-            const newSegments: TranscriptSegment[] = data.segments.map((seg: any, index: number) => ({
-              id: `${Date.now()}-${index}-${Math.random()}`,
-              text: seg.text,
-              timestamp: new Date(seg.start * 1000).toISOString().substr(14, 5),
-              confidence: seg.confidence,
-              start: seg.start,
-              end: seg.end,
-            }));
+            // Only add segments that are NEW (after the last transcribed duration)
+            const newSegments: TranscriptSegment[] = data.segments
+              .filter((seg: any) => seg.start >= lastDuration)
+              .map((seg: any, index: number) => ({
+                id: `${Date.now()}-${index}-${Math.random()}`,
+                text: seg.text,
+                timestamp: new Date(seg.start * 1000).toISOString().substr(14, 5),
+                confidence: seg.confidence,
+                start: seg.start,
+                end: seg.end,
+              }));
             
-            setTranscriptSegments(prev => [...prev, ...newSegments]);
-            console.log(`Added ${newSegments.length} transcript segments from chunk`);
-            
-            // Generate rolling summary after adding new segments
-            await generateRollingSummary();
+            if (newSegments.length > 0) {
+              setTranscriptSegments(prev => [...prev, ...newSegments]);
+              console.log(`Added ${newSegments.length} new transcript segments`);
+              
+              // Generate rolling summary after adding new segments
+              await generateRollingSummary();
+            }
           } else if (data.text) {
             const newSegment: TranscriptSegment = {
               id: `${Date.now()}-${Math.random()}`,
@@ -744,13 +745,13 @@ export default function RecordingTest() {
             };
             
             setTranscriptSegments(prev => [...prev, newSegment]);
-            console.log('Added transcript segment from chunk');
+            console.log('Added transcript segment');
             
             // Generate rolling summary after adding new segment
             await generateRollingSummary();
           }
         } catch (err) {
-          console.error('Error in chunk processing:', err);
+          console.error('Error in incremental processing:', err);
         }
       };
       
@@ -758,9 +759,9 @@ export default function RecordingTest() {
         console.error('FileReader error:', error);
       };
       
-      reader.readAsDataURL(chunkBlob);
+      reader.readAsDataURL(audioBlob);
     } catch (error: any) {
-      console.error('Chunk processing error:', error);
+      console.error('Accumulated audio processing error:', error);
     }
   };
 
