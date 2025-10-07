@@ -328,7 +328,7 @@ export const AudioRecorder = ({ sessionId, isSessionLive, expectedSpeakers = [] 
               <SelectValue placeholder="Select speaker" />
             </SelectTrigger>
             <SelectContent className="bg-background z-50">
-              {expectedSpeakers.map((speaker) => (
+              {expectedSpeakers.filter(speaker => speaker && speaker.trim()).map((speaker) => (
                 <SelectItem key={speaker} value={speaker}>
                   {speaker}
                 </SelectItem>

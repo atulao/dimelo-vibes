@@ -209,7 +209,7 @@ export const RecordingSettings = ({ sessionId }: RecordingSettingsProps) => {
               <SelectValue placeholder="Select microphone" />
             </SelectTrigger>
             <SelectContent>
-              {audioDevices.map(device => (
+              {audioDevices.filter(device => device.deviceId).map(device => (
                 <SelectItem key={device.deviceId} value={device.deviceId}>
                   {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
                 </SelectItem>

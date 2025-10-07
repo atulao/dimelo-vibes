@@ -395,7 +395,7 @@ export default function RecordingTest() {
                   <SelectValue placeholder="Select microphone" />
                 </SelectTrigger>
                 <SelectContent>
-                  {devices.map((device) => (
+                  {devices.filter(device => device.deviceId).map((device) => (
                     <SelectItem key={device.deviceId} value={device.deviceId}>
                       {device.label || `Microphone ${device.deviceId.slice(0, 8)}`}
                     </SelectItem>
