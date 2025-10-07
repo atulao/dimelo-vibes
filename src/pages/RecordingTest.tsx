@@ -1308,6 +1308,75 @@ export default function RecordingTest() {
           </Card>
         )}
 
+        {/* Save Session Card - Shows after recording is complete */}
+        {recordedAudioBlob && !savedSession && (
+          <Card className="border-primary">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Save className="h-5 w-5" />
+                Save This Session
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold">{Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}</div>
+                    <div className="text-xs text-muted-foreground">Duration</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold">{transcriptSegments.length}</div>
+                    <div className="text-xs text-muted-foreground">Segments</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold">{aiSummary ? "✓" : "–"}</div>
+                    <div className="text-xs text-muted-foreground">AI Summary</div>
+                  </div>
+                </div>
+                <Button onClick={() => setShowSaveDialog(true)} className="w-full" size="lg">
+                  <Save className="mr-2 h-4 w-4" />
+                  Save & Share Session
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Saved Session Card - Shows after session is saved */}
+        {savedSession && (
+          <Card className="border-primary bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <QrCode className="h-5 w-5" />
+                Session Saved!
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Your session "{savedSession.title}" has been saved and is ready to share.
+                </p>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => setShowQRDialog(true)} 
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <QrCode className="mr-2 h-4 w-4" />
+                    View QR Code
+                  </Button>
+                  <Button 
+                    onClick={() => navigate(`/session/${savedSession.id}/replay`)}
+                    className="flex-1"
+                  >
+                    View Session
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Rolling Summaries - Shows real-time summaries during recording */}
         {rollingSummaries.length > 0 && (
           <Card id="rolling-summaries">
@@ -1549,6 +1618,89 @@ export default function RecordingTest() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Save Session Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Save Session</DialogTitle>
+            <DialogDescription>
+              Save this session to make it accessible to others with a shareable link and QR code.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Session Title *</Label>
+              <Input
+                id="title"
+                value={sessionTitle}
+                onChange={(e) => setSessionTitle(e.target.value)}
+                placeholder="e.g., Product Launch Discussion"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                value={sessionDescription}
+                onChange={(e) => setSessionDescription(e.target.value)}
+                placeholder="Brief description of what was discussed..."
+                rows={3}
+              />
+            </div>
+            <div className="rounded-lg bg-muted p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Recording Duration:</span>
+                <span className="font-medium">{Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Transcript Segments:</span>
+                <span className="font-medium">{transcriptSegments.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">AI Summary:</span>
+                <span className="font-medium">{aiSummary ? "Included" : "Not generated"}</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowSaveDialog(false)}
+                variant="outline"
+                className="flex-1"
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveSession}
+                className="flex-1"
+                disabled={isSaving || !sessionTitle.trim()}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Session
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Code Dialog */}
+      {savedSession && (
+        <QRCodeDialog
+          session={savedSession}
+          open={showQRDialog}
+          onOpenChange={setShowQRDialog}
+        />
+      )}
     </div>
   );
 }
