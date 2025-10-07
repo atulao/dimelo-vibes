@@ -719,6 +719,9 @@ export default function RecordingTest() {
           setAverageConfidence(data.averageConfidence);
         }
         
+        // Store the uploaded file as recordedAudioBlob to enable saving
+        setRecordedAudioBlob(file);
+        
         toast({
           title: "Transcription complete",
           description: `Processed ${file.name} successfully. Language: ${data.language || 'Unknown'}`,
@@ -731,6 +734,9 @@ export default function RecordingTest() {
         };
         
         setTranscriptSegments([newSegment]);
+        
+        // Store the uploaded file as recordedAudioBlob to enable saving
+        setRecordedAudioBlob(file);
         
         toast({
           title: "Transcription complete",
