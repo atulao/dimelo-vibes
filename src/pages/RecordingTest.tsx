@@ -133,28 +133,62 @@ export default function RecordingTest() {
   // Audio playback controls
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !recordedAudioBlob) return;
+
+    // Set the audio source
+    const blobUrl = URL.createObjectURL(recordedAudioBlob);
+    audio.src = blobUrl;
+    audio.load();
 
     const handleTimeUpdate = () => {
+      console.log('Time update:', audio.currentTime, '/', audio.duration);
       setCurrentTime(audio.currentTime);
     };
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
+      console.log('Audio loaded, duration:', audio.duration);
+      if (!isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+
+    const handleDurationChange = () => {
+      console.log('Duration change:', audio.duration);
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
+      setCurrentTime(0);
     };
 
+    const handleError = (e: Event) => {
+      console.error('Audio error:', e);
+      setIsPlaying(false);
+    };
+
+    // Add all event listeners
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("durationchange", handleDurationChange);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
+
+    // If audio is already loaded, set duration
+    if (audio.readyState >= 1 && audio.duration && !isNaN(audio.duration)) {
+      console.log('Audio already loaded:', audio.duration);
+      setDuration(audio.duration);
+    }
 
     return () => {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("durationchange", handleDurationChange);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
+      URL.revokeObjectURL(blobUrl);
     };
   }, [recordedAudioBlob]);
 
@@ -768,13 +802,6 @@ export default function RecordingTest() {
       setIsPlaying(false);
     } else {
       try {
-        // Create a new blob URL each time we play
-        const blobUrl = URL.createObjectURL(recordedAudioBlob);
-        audioRef.current.src = blobUrl;
-        
-        // Wait for audio to load before playing
-        audioRef.current.load();
-        
         await audioRef.current.play();
         setIsPlaying(true);
         
